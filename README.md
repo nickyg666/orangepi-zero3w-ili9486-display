@@ -1,6 +1,9 @@
 # ILI9486 SPI Display Support for Orange Pi Zero 3W
 
-Complete implementation of ILI9486 3.5" SPI TFT display (480x320) with XPT2046 touchscreen for Orange Pi Zero 3W (A733/sun60iw2p1).
+Completely broken AI-SLOP garbage implementation of ILI9486 3.5" SPI TFT display (480x320) with XPT2046 touchscreen for Orange Pi Zero 3W (A733/sun60iw2p1).
+don't worry, when it refuses to boot after you enable the dtbo, you're totally fucked.
+they didn't write any troubleshooting for that. maybe you could just disable it but it probably broke the kernel with the modules too, so roll those back as well 
+
 
 ## Features
 
