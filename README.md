@@ -1,68 +1,66 @@
 # ILI9486 SPI Display Support for Orange Pi Zero 3W
 
-Completely broken AI-SLOP garbage implementation of ILI9486 3.5" SPI TFT display (480x320) with XPT2046 touchscreen for Orange Pi Zero 3W (A733/sun60iw2p1).
-don't worry, when it refuses to boot after you enable the dtbo, you're totally fucked.
-they didn't write any troubleshooting for that. maybe you could just disable it but it probably broke the kernel with the modules too, so roll those back as well 
+Working ILI9486 3.5" SPI TFT (480x320, driven at 3x scale as a 1440x960 framebuffer)
+with XPT2046/ADS7846 touchscreen on the Orange Pi Zero 3W (A133, sun60iw2 / 6.6.98-sun60iw2).
 
+The module is the standard 3.5" RPi-LCD family (lcdwiki **MPI3501**, "rpi3501"), wired
+rev-A on the board's 26-pin header. The display works as a framebuffer console and under
+X (fbdev). Touch: software stack is complete and live; the panel's touch flex is suspect
+(see Touch section) and needs a re-seat before confirming the glass.
 
 ## Features
 
-- ✅ TinyDRM kernel module (ili9486 + drm_mipi_dbi)
-- ✅ Device tree overlay for SPI3 configuration
-- ✅ Framebuffer support at 30fps
-- ✅ X11 configuration with fbdev driver
-- ✅ Touch calibration for XPT2046
-- ✅ Auto-load on boot
-- ✅ 40 MHz SPI speed (ILI9486 maximum)
+- TinyDRM kernel module (`ili9486` + `drm_mipi_dbi`) — built for 6.6.98-sun60iw2
+- DT overlay enables SPI3 and the panel; **3x scale** virtual framebuffer (1440x960)
+- Framebuffer console on the panel (`fbcon=map:1` in `/boot/orangepiEnv.txt`)
+- X11 on the panel via fbdev driver (`10-fbdev-lcd.conf`)
+- ADS7846 touch driver with libinput-compatible pressure (`ti,pressure-max=<255>`)
+- Backlight: driver is backlight-aware; PWM overlay staged but not enabled (needs wiring)
 
-## Hardware Requirements
+## Pin Mapping (rev-A, verified vs Zero 3W schematic pg.17)
 
-- Orange Pi Zero 3W (A733)
-- Waveshare 3.5" SPI TFT display (ILI9486 controller)
-- XPT2046 resistive touchscreen (included with display)
+| Function | SoC pin | Header | Description |
+|----------|---------|--------|-------------|
+| SPI3-CS0 | PE0     | 24     | LCD chip select (low active) |
+| SPI3-CLK | PE1     | 23     | SPI clock |
+| SPI3-MOSI| PE2     | 19     | LCD/TP data in |
+| SPI3-MISO| PE3     | 21     | TP data out |
+| SPI3-CS1 | PE4     | 26     | Touch chip select (low active) |
+| LCD_RS   | PL3     | 18     | Data/Command select |
+| RST      | PD0     | 22     | Display reset (optional in driver) |
+| TP_IRQ   | PB0     | 11     | Touch interrupt (active-low, pulled up) |
+| 3.3V     | -       | 1,17   | Power |
+| 5V       | -       | 2,4    | Power |
+| GND      | -       | 6,9,14,20,25 | Ground |
 
-## Pin Mapping
-
-| Function | GPIO | Pin | Description |
-|----------|------|-----|-------------|
-| SPI3-CS0 | PE0 | 24 | Display chip select |
-| SPI3-CLK | PE1 | 23 | SPI clock |
-| SPI3-MOSI | PE2 | 19 | Master out slave in |
-| SPI3-MISO | PE3 | 21 | Master in slave out |
-| SPI3-CS1 | PE4 | 26 | Touch chip select |
-| Reset | PE5 | - | Display reset (active low) |
-| DC | PE6 | - | Data/Command select |
-| Touch IRQ | PK23 | 22 | Touch interrupt |
-
-**Note**: Backlight is on by default (no GPIO control needed).
+**Note**: No backlight pin on the module's 26-pin feed — the LED is rail-powered (always
+on). For brightness control see `sun60i-a733-ili9486-backlight.dts` (needs hardware).
 
 ## Installation
 
-### 1. Copy Files
+### 1. Copy files
 
 ```bash
-# Device tree overlay
-sudo cp sun60i-a733-spi-lcd.dtbo /boot/dtb-6.6.98-sun60iw2/allwinner/overlay/
+# DT overlays
+sudo cp sun60i-a733-ili9486.dtbo /boot/dtb/allwinner/overlay/
 
 # Kernel modules
-sudo mkdir -p /lib/modules/6.6.98-sun60iw2/kernel/drivers/gpu/drm/tiny/
-sudo cp drm_mipi_dbi.ko ili9486.ko /lib/modules/6.6.98-sun60iw2/kernel/drivers/gpu/drm/tiny/
+sudo mkdir -p /lib/modules/6.6.98-sun60iw2/extra
+sudo cp ili9486.ko drm_mipi_dbi.ko ads7846.ko /lib/modules/6.6.98-sun60iw2/extra/
 sudo depmod -a
 
-# X11 configuration
-sudo cp 20-ili9486.conf /etc/X11/xorg.conf.d/
-sudo cp 99-calibration.conf /etc/X11/xorg.conf.d/
+# X11 config
+sudo cp 10-fbdev-lcd.conf /etc/X11/xorg.conf.d/
 
-# Auto-load configuration
+# Auto-load
 sudo cp ili9486.conf /etc/modules-load.d/
 ```
 
-### 2. Update Boot Configuration
-
-Edit `/boot/orangepiEnv.txt` and add `spi-lcd` to overlays:
+### 2. Boot config (`/boot/orangepiEnv.txt`)
 
 ```
-overlays=spi3-cs0-cs1-spidev spi-lcd uart2
+overlays=ili9486
+extraargs=fbcon=map:1
 ```
 
 ### 3. Reboot
@@ -73,188 +71,99 @@ sudo reboot
 
 ## Verification
 
-After reboot, verify the installation:
-
 ```bash
-# Check modules are loaded
-lsmod | grep ili9486
-
-# Check framebuffer exists
-ls -la /dev/fb*
-
-# Check DRM connectors
-cat /sys/class/drm/*/status
-
-# Check kernel messages
-dmesg | grep -i ili9486
+lsmod | grep -E "ili9486|ads7846"      # modules loaded
+cat /sys/class/drm/card1-SPI-1/status   # connected
+ls -la /dev/fb1                          # 1440x960 framebuffer
+dmesg | grep -iE "ili9486|ads7846"
+cat /proc/bus/input/devices | grep -A6 -i ads7846
 ```
 
-Expected output:
-- `/dev/fb1` should exist for SPI display
-- `ili9486` and `drm_mipi_dbi` modules should be loaded
-- DRM should show SPI-1 connector
+## Backlight (staged, not enabled)
 
-## Usage
+The driver already hooks `devm_of_find_backlight()` (`source/ili9486.c`), so wiring a
+`backlight` DT property drives the standard backlight class. `sun60i-a733-ili9486-backlight.dts`
+adds a `pwm-backlight` on **PWM0-0 (PB4, header pin 7)** at 200Hz.
 
-### Start X11 on SPI Display
+- Header pin 7 = PB4 = PWM0-0 (the only PWM channel on the populated 1-26 range;
+  PWM0-1..7 are PD1-PD7, not on the header).
+- To enable: `sudo cp sun60i-a733-ili9486-backlight.dtbo /boot/dtb/allwinner/overlay/`
+  and add `ili9486-backlight` to `overlays=` in `/boot/orangepiEnv.txt`.
+  **Risk**: if the pwm-backlight fails to bind, the ili9486 probe fails (the boot
+  watchdog auto-rolls after 3 bad boots).
+- Requires hardware: wire pin 7 into the module's backlight feed (e.g. sink PWM via a
+  PNP/FET into the LED rail, or lift the module BL jumper). After wiring,
+  `/sys/class/backlight/ili9486-bl/brightness` (0-255).
 
-```bash
-startx
-```
+## Touchscreen (XPT2046 / ADS7846)
 
-### Test Framebuffer
+- Driver: `ads7846` on spi3.1, IRQ 25 (PB0), input event device.
+- `ti,pressure-max=<255>` in the DT (or driver fallback) is **required** or libinput
+  rejects the device (`min == max on ABS_PRESSURE`). See `source/ads7846.c`.
+- Raw probe method (for a healthy-panel sanity check):
+  `echo spi3.1 > /sys/bus/spi/drivers/ads7846/unbind`, then bind `spidev` to spi3.1
+  and read channels (see `tools/xpt_probe.py`). Re-binding ads7846 needs a reboot
+  (pinctrl IRQ remap bug on this BSP).
+- **Channel mapping gotcha**: XPT2046 differential channels are `001=Y`, `011=Z1`,
+  `100=Z2`, `101=X`. The 12-bit command bytes are X=`0xD4`, Y=`0x94`, Z1=`0xB4`,
+  Z2=`0xC4` (8-bit-mode: X=`0xDC`, Y=`0x9C`, Z1=`0xBC`, Z2=`0xCC`). An earlier probe
+  had X/Y swapped; use `xpt_probe.py` (all SPI modes) to validate.
+- PENIRQ polarity: **active-low** — sits high, pulled low on touch. DT config matches:
+  `interrupts = <1 0 8>` (LEVEL_LOW on PB0), `pendown-gpios` ACTIVE_LOW.
+- Current status: panel does not respond to presses on any channel/mode and PENIRQ
+  never asserts — suggests the touch flex (FPC) to the XPT2046 is loose/cold rather
+  than the glass. Re-seat the touch FPC, re-run `tools/xpt_probe.py`.
 
-```bash
-# Write test pattern
-sudo dd if=/dev/urandom of=/dev/fb1 bs=1 count=$((320*480*2))
-```
+## Second/Third Display Options
 
-### Mirror HDMI to SPI Display
+- card0 = `sunxi-drm` (built-in): DP-1, HDMI-A-1, Writeback-1 — no KMS dumb buffers,
+  so X modesetting fails ("dumb interface" unsupported).
+- card1 = ili9486 (SPI, fb1). card2 = pvrsrvkm (GPU).
+- Zero-hardware second display: use `/dev/fb0` (HDMI legacy framebuffer) for a second
+  fbcon / SDL/directfb app.
+- Second SPI panel: spi1/spi2/spi4 exist but are disabled and their pins are NOT on
+  the 26-pin header (off-header routing needed; spi0 is PC2/3/4/12).
+- Kernel rebuild with dumb-buffer support would be needed for X on HDMI.
 
-```bash
-# Copy HDMI framebuffer to SPI display in real-time
-while true; do
-    dd if=/dev/fb0 of=/dev/fb1 bs=4096 2>/dev/null
-    sleep 0.033
-done
-```
-
-## Technical Details
-
-### Display Configuration
-
-- **Resolution**: 320x480 (after 270° rotation)
-- **Color Depth**: 16-bit (RGB565)
-- **Refresh Rate**: 30 Hz
-- **SPI Speed**: 40 MHz
-- **Rotation**: 270° (landscape mode)
-
-### Touch Configuration
-
-- **Controller**: XPT2046 (ADS7846 compatible)
-- **SPI Speed**: 250 kHz
-- **Calibration**: 3950 230 3900 300
-- **Settings**: SwapAxes=1, InvertX=1
-
-### Performance
-
-- **Framebuffer Size**: 307 KB (320×480×2 bytes)
-- **Transfer Time**: ~61ms at 40 MHz SPI
-- **Achieved FPS**: ~16 FPS (SPI bandwidth limited)
-- **Target FPS**: 30 FPS (requires partial updates)
-
-## Troubleshooting
-
-### Display Not Working
-
-1. Check SPI device exists:
-   ```bash
-   ls -la /dev/spidev3.0
-   ```
-
-2. Verify overlay is loaded:
-   ```bash
-   cat /boot/orangepiEnv.txt | grep overlays
-   ```
-
-3. Check kernel messages:
-   ```bash
-   dmesg | grep -iE "ili9486|spi|drm"
-   ```
-
-### Touch Not Working
-
-1. Check touch device:
-   ```bash
-   cat /proc/bus/input/devices | grep -A 5 ADS7846
-   ```
-
-2. Recalibrate:
-   ```bash
-   sudo apt-get install xinput-calibrator
-   xinput_calibrator
-   ```
-
-### X11 Not Starting
-
-1. Check X11 log:
-   ```bash
-   cat /var/log/Xorg.0.log
-   ```
-
-2. Verify fbdev driver:
-   ```bash
-   sudo apt-get install xserver-xorg-video-fbdev
-   ```
-
-## Building from Source
-
-### Kernel Modules
+## Building from Source (`source/`)
 
 ```bash
-# Download kernel source
-cd /tmp
-curl -sL "https://raw.githubusercontent.com/torvalds/linux/v6.6/drivers/gpu/drm/tiny/ili9486.c" -o ili9486.c
-curl -sL "https://raw.githubusercontent.com/torvalds/linux/v6.6/drivers/gpu/drm/drm_mipi_dbi.c" -o drm_mipi_dbi.c
-
-# Create Makefile
-cat > Makefile << 'MAKEFILE'
-obj-m += drm_mipi_dbi.o ili9486.o
-KDIR := /lib/modules/$(shell uname -r)/build
-PWD := $(shell pwd)
-all:
-	$(MAKE) -C $(KDIR) M=$(PWD) modules
-clean:
-	$(MAKE) -C $(KDIR) M=$(PWD) clean
-MAKEFILE
-
-# Build
-make
-
-# Install
-sudo cp *.ko /lib/modules/6.6.98-sun60iw2/kernel/drivers/gpu/drm/tiny/
+cd source
+make -C /lib/modules/$(uname -r)/build M=$PWD modules   # drm_mipi_dbi + ili9486
+make -f Makefile.ads7846 -C /lib/modules/$(uname -r)/build M=$PWD modules
+sudo cp drm_mipi_dbi.ko ili9486.ko ads7846.ko /lib/modules/6.6.98-sun60iw2/extra/
 sudo depmod -a
 ```
 
-### Device Tree Overlay
-
-```bash
-# Preprocess
-cpp -nostdinc -I/usr/src/linux-headers-6.6.98-sun60iw2/include \
-    -I/usr/src/linux-headers-6.6.98-sun60iw2/arch/arm64/boot/dts \
-    -I/usr/src/linux-headers-6.6.98-sun60iw2/arch/arm64/boot/dts/allwinner \
-    -undef -D__DTS__ -x assembler-with-cpp \
-    sun60i-a733-spi-lcd.dts > spi-lcd.i
-
-# Compile
-dtc -O dtb -o sun60i-a733-spi-lcd.dtbo -b 0 -@ - < spi-lcd.i
-```
+Driver sources here are the **modified** versions used on the board:
+- `ili9486.c`: 3x `scale` DT property (virtual 1440x960), `devm_gpiod_get_optional`
+  reset, backlight lookup.
+- `ads7846.c`: `pressure_max` fallback to 255 if unset (libinput fix).
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `sun60i-a733-spi-lcd.dts` | Device tree source |
-| `sun60i-a733-spi-lcd.dtbo` | Compiled overlay |
-| `drm_mipi_dbi.ko` | MIPI DBI helper module |
-| `ili9486.ko` | ILI9486 TinyDRM module |
-| `20-ili9486.conf` | X11 display configuration |
-| `99-calibration.conf` | Touch calibration |
-| `ili9486.conf` | Module auto-load config |
+| `sun60i-a733-ili9486.dts/.dtbo` | Current working overlay (rev-A) |
+| `sun60i-a733-ili9486-backlight.dts/.dtbo` | Staged pwm-backlight (PWM0-0/pin 7) |
+| `ili9486.ko`, `drm_mipi_dbi.ko`, `ads7846.ko` | Live built modules (6.6.98-sun60iw2) |
+| `10-fbdev-lcd.conf` | X fbdev config (fb1, 1440x960, Depth 24) |
+| `ili9486.conf` | Module auto-load (drm_mipi_dbi, ili9486, ads7846) |
+| `pinout ili9486+xpt20xx` | Verified header pinout |
+| `source/` | Driver sources + Makefiles |
+| `tools/` | `test_ili9486.py` (display), `xpt_probe.py` (touch probe) |
 
-## References
+## Troubleshooting
 
-- [ILI9486 Datasheet](https://www.waveshare.com/w/upload/3/3c/ILI9486.pdf)
-- [XPT2046 Datasheet](https://www.waveshare.com/w/upload/4/4e/XPT2046.pdf)
-- [Orange Pi Zero 3W User Manual](http://www.orangepi.org/html/hardWare/computerAndMicrocontrollers/service-and-support/Orange-Pi-Zero-3W.html)
-- [Linux Kernel v6.6](https://github.com/torvalds/linux/tree/v6.6)
+- **No display after overlay**: check `dmesg | grep -iE "ili9486|mipi_dbi|spi3"`.
+  A boot-watchdog rolls back after 3 failed boots (see `ili9486-boot-watchdog.sh`
+  note in AGENTS.md of the workspace).
+- **X fails**: ensure `AutoAddGPU false` and fbdev on `/dev/fb1` are in place; without
+  the fbdev config X falls back to modesetting → "dumb interface" error.
+- **Touch rejected by libinput**: ensure `ti,pressure-max` present (or use the driver
+  fallback build).
 
 ## License
 
-This project is provided as-is for educational and personal use.
-
-## Credits
-
-- ILI9486 TinyDRM driver: Kamlesh Gurudasani
-- Orange Pi: Shenzhen Xunlong Software Co., Ltd
-- Waveshare: Display hardware manufacturer
+Provided as-is for educational and personal use. Kernel driver code derives from
+Linux (GPL) — see the kernel tree for the original ili9486/drm_mipi_dbi/ads7846 drivers.

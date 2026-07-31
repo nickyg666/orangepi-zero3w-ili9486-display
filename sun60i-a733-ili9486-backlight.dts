@@ -1,0 +1,52 @@
+/dts-v1/;
+/plugin/;
+
+/*
+ * ILI9486 backlight overlay — pwm-backlight on PWM0-0 (PB4, header pin 7).
+ *
+ * The rpi3501/MPI3501 module has NO backlight pin on its 26-pin feed; the LED
+ * is powered from the 5V rail always-on. To get brightness control, wire
+ * header pin 7 (PB4/PWM0-0) into the module's backlight feed (e.g. sink PWM
+ * into a PNP / gate a FET controlling the LED rail, or lift the BL+ trace
+ * jumper on the module and drive it from this signal).
+ *
+ * Driver support: ili9486.c uses devm_of_find_backlight() (ili9486.c:229) and
+ * drm_mipi_dbi.c toggles backlight_enable/disable — the `backlight` property
+ * below is what wires the panel to this pwm-backlight device.
+ *
+ * After wiring + reboot: /sys/class/backlight/ili9486-bl/brightness (0-255).
+ */
+/ {
+	fragment@0 {
+		target-path = "/";
+		__overlay__ {
+			ili9486_bl: pwm-backlight {
+				compatible = "pwm-backlight";
+				/* PWM0-0 (channel 0, PB4), 200Hz, no flags */
+				pwms = <&pwm0 0 5000000 0>;
+				brightness-levels = <0 8 16 32 64 96 128 160 192 224 255>;
+				default-brightness-level = <10>;
+				status = "okay";
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <&pwm0>;
+		__overlay__ {
+			pinctrl-names = "active", "sleep";
+			pinctrl-0 = <&pwm0_0_pins_active>;
+			pinctrl-1 = <&pwm0_0_pins_sleep>;
+			status = "okay";
+		};
+	};
+
+	fragment@2 {
+		target = <&spi3>;
+		__overlay__ {
+			ili9486@0 {
+				backlight = <&ili9486_bl>;
+			};
+		};
+	};
+};
