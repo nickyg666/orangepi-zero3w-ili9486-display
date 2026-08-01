@@ -201,25 +201,6 @@ EXPORT_SYMBOL(mipi_dbi_command_stackbuf);
  * Returns:
  * Zero on success, negative error code on failure.
  */
-
-/*
- * Panels using 18-bit RGB666 send 3 bytes/pixel instead of 2 (RGB565).
- * Stored in a module global because struct mipi_dbi comes from the kernel
- * headers and cannot be extended by this out-of-tree module.
- */
-static bool mipi_dbi_rgb666;
-
-void mipi_dbi_set_rgb666(bool enable)
-{
-	mipi_dbi_rgb666 = enable;
-}
-EXPORT_SYMBOL(mipi_dbi_set_rgb666);
-
-static inline bool mipi_dbi_is_rgb666(struct mipi_dbi *dbi)
-{
-	return mipi_dbi_rgb666;
-}
-
 int mipi_dbi_buf_copy(void *dst, struct iosys_map *src, struct drm_framebuffer *fb,
 		      struct drm_rect *clip, bool swap)
 {
@@ -238,16 +219,9 @@ int mipi_dbi_buf_copy(void *dst, struct iosys_map *src, struct drm_framebuffer *
 		else
 			drm_fb_memcpy(&dst_map, NULL, src, fb, clip);
 		break;
-	case DRM_FORMAT_XRGB8888: {
-		struct mipi_dbi_dev *dbidev = drm_to_mipi_dbi_dev(fb->dev);
-
-		if (mipi_dbi_is_rgb666(&dbidev->dbi))
-			/* 18-bit mode: panel uses the top 6 bits of each 8-bit component */
-			drm_fb_xrgb8888_to_rgb888(&dst_map, NULL, src, fb, clip);
-		else
-			drm_fb_xrgb8888_to_rgb565(&dst_map, NULL, src, fb, clip, swap);
+	case DRM_FORMAT_XRGB8888:
+		drm_fb_xrgb8888_to_rgb565(&dst_map, NULL, src, fb, clip, swap);
 		break;
-	}
 	default:
 		drm_err_once(fb->dev, "Format is not supported: %p4cc\n",
 			     &fb->format->format);
@@ -338,23 +312,15 @@ static void mipi_dbi_scaled_fb_dirty(struct iosys_map *src,
 			g = DIV_ROUND_UP(g, n);
 			b = DIV_ROUND_UP(b, n);
 
-			if (mipi_dbi_is_rgb666(dbi)) {
-				/* RGB666, 3 bytes/pixel */
-				tr[(j * pw + i) * 3] = r;
-				tr[(j * pw + i) * 3 + 1] = g;
-				tr[(j * pw + i) * 3 + 2] = b;
-			} else {
-				/* RGB565, high byte first (matches panel wire order) */
-				tr[(j * pw + i) * 2] = (r & 0xf8) | ((g & 0xe0) >> 5);
-				tr[(j * pw + i) * 2 + 1] = ((g & 0x1c) << 3) | ((b & 0xf8) >> 3);
-			}
+			/* RGB565, high byte first (matches panel wire order) */
+			tr[(j * pw + i) * 2] = (r & 0xf8) | ((g & 0xe0) >> 5);
+			tr[(j * pw + i) * 2 + 1] = ((g & 0x1c) << 3) | ((b & 0xf8) >> 3);
 		}
 	}
 
 	mipi_dbi_set_window_address(dbidev, px1, px1 + pw - 1, py1, py1 + ph - 1);
 
-	ret = mipi_dbi_command_buf(dbi, MIPI_DCS_WRITE_MEMORY_START, tr,
-				  pw * ph * (mipi_dbi_is_rgb666(dbi) ? 3 : 2));
+	ret = mipi_dbi_command_buf(dbi, MIPI_DCS_WRITE_MEMORY_START, tr, pw * ph * 2);
 	if (ret)
 		drm_err_once(fb->dev, "Failed to update display %d\n", ret);
 }
@@ -394,7 +360,7 @@ static void mipi_dbi_fb_dirty(struct iosys_map *src, struct drm_framebuffer *fb,
 				    rect->y2 - 1);
 
 	ret = mipi_dbi_command_buf(dbi, MIPI_DCS_WRITE_MEMORY_START, tr,
-				   width * height * (mipi_dbi_is_rgb666(dbi) ? 3 : 2));
+				   width * height * 2);
 err_msg:
 	if (ret)
 		drm_err_once(fb->dev, "Failed to update display %d\n", ret);
@@ -805,8 +771,7 @@ int mipi_dbi_dev_init(struct mipi_dbi_dev *dbidev,
 		      const struct drm_simple_display_pipe_funcs *funcs,
 		      const struct drm_display_mode *mode, unsigned int rotation)
 {
-	/* Allocate for 3 bytes/pixel (18-bit RGB666) to support full color depth */
-	size_t bufsize = mode->vdisplay * mode->hdisplay * 3;
+	size_t bufsize = mode->vdisplay * mode->hdisplay * sizeof(u16);
 
 	dbidev->drm.mode_config.preferred_depth = 16;
 
@@ -1235,7 +1200,7 @@ static int mipi_dbi_typec1_command_read(struct mipi_dbi *dbi, u8 *cmd,
 static int mipi_dbi_typec1_command(struct mipi_dbi *dbi, u8 *cmd,
 				   u8 *parameters, size_t num)
 {
-	unsigned int bpw = (*cmd == MIPI_DCS_WRITE_MEMORY_START && !mipi_dbi_is_rgb666(dbi)) ? 16 : 8;
+	unsigned int bpw = (*cmd == MIPI_DCS_WRITE_MEMORY_START) ? 16 : 8;
 	int ret;
 
 	if (mipi_dbi_command_is_read(dbi, *cmd))
@@ -1340,7 +1305,7 @@ static int mipi_dbi_typec3_command(struct mipi_dbi *dbi, u8 *cmd,
 	if (ret || !num)
 		return ret;
 
-	if (*cmd == MIPI_DCS_WRITE_MEMORY_START && !dbi->swap_bytes && !mipi_dbi_is_rgb666(dbi))
+	if (*cmd == MIPI_DCS_WRITE_MEMORY_START && !dbi->swap_bytes)
 		bpw = 16;
 
 	spi_bus_lock(spi->controller);
