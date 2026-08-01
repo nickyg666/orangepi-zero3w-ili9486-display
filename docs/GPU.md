@@ -28,3 +28,14 @@
 - CONCLUSION: GL desktop compositing via GPU not feasible without vendor fix.
   Raw Vulkan WORKS (PowerVR BXM-4-64, API 1.3.277) - usable for custom rendering
   (e.g. GPU-accelerated video player -> downscale -> SPI framebuffer).
+
+## Updated findings (post-gpu-vpu install)
+- Vendor /usr/local/lib/dri/pvr_dri.so HAS __driDriverGetExtensions_pvr
+- But vendor EGL (Mesa 24.0.1) falls back to softpipe even with
+  MESA_LOADER_DRIVER_OVERRIDE=pvr - pvr DRI driver fails to initialize
+  (DRI2 auth under X11/fbdev)
+- Vulkan works fully (libVK_IMG, PowerVR BXM-4-64 MC1, API 1.3.277)
+- CONCLUSION: desktop GL compositing via PowerVR not working in this
+  X11+fbdev config; vendor EGL is Mesa 24.0.1 but pvr_dri silently fails.
+  Use Vulkan for custom GPU rendering. Temps OK at 61C idle (llvmpipe
+  only burns CPU when actively compositing).
