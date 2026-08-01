@@ -53,3 +53,15 @@ No mutter env/gsetting exists to exclude a DRM device. udev TAG- can't
 strip seat tags (71-seat.rules re-adds them). Fix needs a mutter patch
 or sunxi-drm driver workaround for the HDMI disconnect path.
 X11 remains the stable display path.
+
+## Binary-level root cause (gdb on core dump)
+Crash: SIGSEGV in g_strjoinv, called from libmutter-10.so.0 at offset 0x1700a4.
+The joined string is the tail of "Failed to get string: No error has been recorded."
+= mutter's KMS backend error-path builds a diagnostic string with a NULL
+GError->message, from a failed udev/DRM property read on sunxi-drm (card0).
+libmutter text base 0x7f87980000 (from core). Format string "Failed to get
+string: %s" at rodata 0x1b5710.
+=> Fix needs: mutter source patch (NULL-guard the error message) OR sunxi-drm
+driver fix (return valid property/error). Neither source is on the system.
+User can help locate: mutter 42 source (gitlab.gnome.org/GNOME/mutter) or
+allwinner sunxi-drm display driver source (linux-6.6 BSP).
