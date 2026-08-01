@@ -921,19 +921,40 @@ static irqreturn_t ads7846_irq(int irq, void *handle)
 {
 	struct ads7846 *ts = handle;
 
-	/* Start with a small delay before checking pendown state */
+	/*
+	 * Don't gate the measurement loop on the pendown GPIO. The nPENIRQ
+	 * line is edge-triggered and the film contact is intermittent, so
+	 * by the time the threaded handler runs the pin has often already
+	 * bounced back high. Instead, always attempt a read: the pressure
+	 * (Z1) filter in ads7846_report_state() rejects spurious samples.
+	 *
+	 * The loop keeps polling while pressure is present; a short dip in
+	 * Z1 (contact bounce) does NOT end the touch - it needs several
+	 * consecutive no-pressure samples before reporting pen-up. This
+	 * prevents a single tap from being split into multiple touches.
+	 */
 	msleep(TS_POLL_DELAY);
 
-	while (!ts->stopped && get_pendown_state(ts)) {
+	{
+		unsigned int no_press = 0;
 
-		/* pen is down, continue with the measurement */
-		ads7846_read_state(ts);
+		while (!ts->stopped) {
 
-		if (!ts->stopped)
-			ads7846_report_state(ts);
+			ads7846_read_state(ts);
 
-		wait_event_timeout(ts->wait, ts->stopped,
-				   msecs_to_jiffies(TS_POLL_PERIOD));
+			if (!ts->stopped)
+				ads7846_report_state(ts);
+
+			if (ts->packet->z1 <= ts->pressure_max / 16) {
+				if (++no_press >= 3)
+					break;
+			} else {
+				no_press = 0;
+			}
+
+			wait_event_timeout(ts->wait, ts->stopped,
+					   msecs_to_jiffies(TS_POLL_PERIOD));
+		}
 	}
 
 	if (ts->pendown && !ts->stopped)
