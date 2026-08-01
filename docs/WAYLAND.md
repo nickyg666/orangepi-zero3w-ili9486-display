@@ -47,3 +47,9 @@ g_str_has_prefix() asserts -> segfault.
    disconnect path (driver-side).
 3. Patch mutter's g_str_has_prefix NULL guard (needs mutter source).
 4. Use X11 (current stable) and add GPU via a different path.
+
+## Status: BLOCKED on mutter segfault
+No mutter env/gsetting exists to exclude a DRM device. udev TAG- can't
+strip seat tags (71-seat.rules re-adds them). Fix needs a mutter patch
+or sunxi-drm driver workaround for the HDMI disconnect path.
+X11 remains the stable display path.
