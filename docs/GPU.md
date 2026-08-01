@@ -19,3 +19,12 @@
 1. Configure Mutter/gnome-shell to use PowerVR EGL (vendor libs in /usr/local/lib)
 2. Or use Vulkan directly for compositing/downscale
 3. GPU could accelerate: gnome-shell compositing, box-filter downscale (960x640->480x320)
+
+## GL/EGL integration findings
+- Vendor GL stack (/usr/local/lib, Mesa 24.0.1) initializes but only via zink (Vulkan-over-GL)
+- zink_dri.so missing from /usr/local/lib/dri -> falls back to softpipe (software)
+- System Mesa (23.2.1) + system zink_dri.so exist but version-mismatch with vendor EGL
+- zink over X11 GLX fails DRI2 auth -> GL_RENDERER null
+- CONCLUSION: GL desktop compositing via GPU not feasible without vendor fix.
+  Raw Vulkan WORKS (PowerVR BXM-4-64, API 1.3.277) - usable for custom rendering
+  (e.g. GPU-accelerated video player -> downscale -> SPI framebuffer).
