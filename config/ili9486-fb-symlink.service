@@ -1,0 +1,13 @@
+[Unit]
+Description=Create stable /dev/fb-lcd symlink for ILI9486
+After=systemd-udevd.service
+Before=display-manager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c "for f in /sys/class/graphics/fb*; do if [ \"$(cat $f/name 2>/dev/null)\" = ili9486drmfb ]; then ln -sf /dev/$(basename $f) /dev/fb-lcd; fi; done"
+ExecStartPost=/bin/sh -c "ls -la /dev/fb-lcd"
+
+[Install]
+WantedBy=multi-user.target
