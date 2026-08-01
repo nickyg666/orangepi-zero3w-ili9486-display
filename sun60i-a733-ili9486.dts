@@ -23,7 +23,7 @@
 				reset-gpios = <&pio 3 0 0>;
 				width = <320>;
 				height = <480>;
-				scale = <3>;
+				scale = <2>;
 			};
 
 			ads7846@1 {
