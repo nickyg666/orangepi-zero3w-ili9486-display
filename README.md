@@ -1,12 +1,10 @@
 # ILI9486 SPI Display Support for Orange Pi Zero 3W
 
-Working ILI9486 3.5" SPI TFT (480x320, driven at **2x scale** as a 960x640 framebuffer for faster SPI refresh) with XPT2046/ADS7846 touchscreen on the Orange Pi Zero 3W (A133, sun60iw2 / 6.6.98-sun60iw2).
+Working ILI9486 3.5" SPI TFT (480x320, driven at **2x scale** as a 960x640 framebuffer for faster SPI refresh) with XPT2046/ADS7846 touchscreen on the Orange Pi Zero 3W (A733, sun60iw2 / 6.6.98-sun60iw2).
 
 The module is the standard 3.5" RPi-LCD family (lcdwiki **MPI3501**, "rpi3501"), wired
 rev-A on the board's 26-pin header. The display works as a framebuffer console and under
-X (fbdev). Touch: software stack is complete and live; the panel's touch flex is suspect
-(see Touch section) and needs a re-seat.
-
+X (fbdev). Touch: software stack is complete and live; 
 **Second display**: HDMI (fb0) works out of the box — `con2fbmap 2 0` maps tty2 to HDMI, switch with Ctrl+Alt+F2.
 
 ## Features
