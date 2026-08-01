@@ -55,3 +55,15 @@ Earlier failures were because EGL_PLATFORM defaulted to x11 (broken) and
 the pvr driver wasn't forced. surfaceless + override=pvr is the key.
 Next: wire this env into gnome-shell/Mutter for GPU compositing, and
 into the Wayland session (which previously crashed on EGL init).
+
+## CAUTION: pvr GL works standalone but breaks mutter
+- eglgl test: pvr works with EGL_PLATFORM=surfaceless (PowerVR BXM-4-64)
+- BUT setting MESA_LOADER_DRIVER_OVERRIDE=pvr globally (Xsession.d) makes
+  gnome-shell/mutter CRASH (g_str_has_prefix NULL -> signal 11) because
+  mutter uses the x11 EGL platform, which the vendor stack can't handle.
+- REVERTED: removed Xsession.d/99-pvr-gpu and /etc/environment overrides.
+- The Wayland crash is the SAME x11-EGL/card0 issue. Standalone pvr GL
+  (surfaceless) works; integrating into mutter needs the x11/EGL platform
+  working (vendor stack gap) or mutter patched.
+- Current state: X11 desktop stable, llvmpipe GL (CPU). GPU usable via
+  standalone Vulkan/GL apps with surfaceless+override=pvr.
