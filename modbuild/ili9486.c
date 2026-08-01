@@ -21,6 +21,9 @@
 #include <drm/drm_gem_dma_helper.h>
 #include <drm/drm_managed.h>
 #include <drm/drm_mipi_dbi.h>
+
+/* Set by drm_mipi_dbi.ko (out-of-tree module cannot extend struct mipi_dbi). */
+void mipi_dbi_set_rgb666(bool enable);
 #include <drm/drm_modeset_helper.h>
 
 #define ILI9486_ITFCTR1         0xb0
@@ -120,7 +123,9 @@ static void waveshare_enable(struct drm_simple_display_pipe *pipe,
 	mipi_dbi_command(dbi, MIPI_DCS_EXIT_SLEEP_MODE);
 	msleep(250);
 
-	mipi_dbi_command(dbi, MIPI_DCS_SET_PIXEL_FORMAT, 0x55);
+	/* 0x66 = 18-bit RGB666 (262K colors); 0x55 = RGB565 (65K colors) */
+	mipi_dbi_set_rgb666(true);
+	mipi_dbi_command(dbi, MIPI_DCS_SET_PIXEL_FORMAT, 0x66);
 
 	mipi_dbi_command(dbi, ILI9486_PWCTRL1, 0x44);
 
