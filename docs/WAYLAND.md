@@ -65,3 +65,14 @@ string: %s" at rodata 0x1b5710.
 driver fix (return valid property/error). Neither source is on the system.
 User can help locate: mutter 42 source (gitlab.gnome.org/GNOME/mutter) or
 allwinner sunxi-drm display driver source (linux-6.6 BSP).
+
+## UNIFIED ROOT CAUSE (wayland + GPU)
+The mutter Wayland crash (g_strjoinv "Failed to get string") is in mutter's
+EGL/GL init path (disasm shows eglDestroyContext nearby, offsets 0x170090).
+It's triggered by the SAME broken GL stack as the GPU problem: vendor Mesa
+24.0.1 (/usr/local/lib) vs system Mesa 23.2.1 mismatch. mutter Wayland init
+tries EGL, hits the broken config, and crashes building an error string.
+=> Fixing the vendor GL stack fixes BOTH Wayland and GPU. Priorities:
+  1. Get ONE consistent GL stack (vendor pvr_dri.so under a matching Mesa)
+  2. OR get zink_dri.so matching the vendor EGL version
+  3. THEN mutter Wayland init won't crash on EGL, and DRI3 enables pvr.
