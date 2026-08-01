@@ -100,19 +100,28 @@ adds a `pwm-backlight` on **PWM0-0 (PB4, header pin 7)** at 200Hz.
 - Driver: `ads7846` on spi3.1, IRQ 25 (PB0), input event device.
 - `ti,pressure-max=<255>` in the DT (or driver fallback) is **required** or libinput
   rejects the device (`min == max on ABS_PRESSURE`). See `source/ads7846.c`.
-- Raw probe method (for a healthy-panel sanity check):
-  `echo spi3.1 > /sys/bus/spi/drivers/ads7846/unbind`, then bind `spidev` to spi3.1
-  and read channels (see `tools/xpt_probe.py`). Re-binding ads7846 needs a reboot
+- Raw probe method (sanity check): `echo spi3.1 > /sys/bus/spi/drivers/ads7846/unbind`,
+  then bind `spidev` to spi3.1 and read channels (see `tools/xpt_probe.py`,
+  `tools/xpt_dfr.py`, `tools/xpt_corr.py`). Re-binding ads7846 needs a reboot
   (pinctrl IRQ remap bug on this BSP).
-- **Channel mapping gotcha**: XPT2046 differential channels are `001=Y`, `011=Z1`,
-  `100=Z2`, `101=X`. The 12-bit command bytes are X=`0xD4`, Y=`0x94`, Z1=`0xB4`,
-  Z2=`0xC4` (8-bit-mode: X=`0xDC`, Y=`0x9C`, Z1=`0xBC`, Z2=`0xCC`). An earlier probe
-  had X/Y swapped; use `xpt_probe.py` (all SPI modes) to validate.
+- **Protocol (corrected)**: touch X/Y/Z commands MUST be **differential** (SER/DFR=0):
+  12-bit X=`0xD0`, Y=`0x90`, Z1=`0xB0`, Z2=`0xC0` (8-bit: X=`0xD8`, Y=`0x98`, Z1=`0xB8`,
+  Z2=`0xC8`). The old probe's `0xD4/0x94/0xB4/0xC4` have SER/DFR=1 (single-ended) which
+  is wrong for touch and yields frozen mid-scale/0 reads. Aliveness SE channels need
+  PD=11 (internal ref on): AUX=`0xE3`, VBAT=`0xA3`, TEMP0=`0x83`, TEMP1=`0xF3`.
 - PENIRQ polarity: **active-low** — sits high, pulled low on touch. DT config matches:
   `interrupts = <1 0 8>` (LEVEL_LOW on PB0), `pendown-gpios` ACTIVE_LOW.
-- Current status: panel does not respond to presses on any channel/mode and PENIRQ
-  never asserts — suggests the touch flex (FPC) to the XPT2046 is loose/cold rather
-  than the glass. Re-seat the touch FPC, re-run `tools/xpt_probe.py`.
+- **Status (2026-08-01, corrected — NOT broken glass)**: the XPT2046 chip is alive and
+  powered, SPI/MISO works, and the protocol is now verified correct. Distinct real MISO
+  patterns per command prove it; `TEMP0` (internal temp diode) settles to a valid ~2046.
+  But touch channels X/Y/Z read bit-exact frozen extremes (X=0, Y=2047) with zero
+  response to firm press bursts, and PENIRQ never asserts. => the **analog interconnect
+  between the resistive film and the XPT2046 is open** (touch FPC / module trace), the
+  film itself is fine. Fix: re-seat the touch FPC; if that fails, multimeter continuity
+  across each film plate at the FPC pads (~500Ω-2kΩ = film good, isolates fault to module
+  PCB). Re-run `tools/xpt_dfr.py` (differential) or `tools/xpt_corr.py` (press-correlation)
+  to confirm.
+- Note: the sunxi SPI driver rejects spidev clocks below ~200kHz (EINVAL).
 
 ## Second/Third Display Options
 
