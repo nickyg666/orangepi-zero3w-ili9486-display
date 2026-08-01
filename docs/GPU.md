@@ -39,3 +39,19 @@
   X11+fbdev config; vendor EGL is Mesa 24.0.1 but pvr_dri silently fails.
   Use Vulkan for custom GPU rendering. Temps OK at 61C idle (llvmpipe
   only burns CPU when actively compositing).
+
+## BREAKTHROUGH: PowerVR GL WORKS with the right env
+Command that yields GPU GL rendering:
+  LD_LIBRARY_PATH=/usr/local/lib \
+  LIBGL_DRIVERS_PATH=/usr/local/lib/dri \
+  MESA_LOADER_DRIVER_OVERRIDE=pvr \
+  EGL_PLATFORM=surfaceless \
+  <gl app>
+Result:
+  GL_VENDOR: Imagination Technologies
+  GL_RENDERER: PowerVR B-Series BXM-4-64
+The vendor Mesa stack (/usr/local/lib, from Incipiens GPU-VPU) DOES work.
+Earlier failures were because EGL_PLATFORM defaulted to x11 (broken) and
+the pvr driver wasn't forced. surfaceless + override=pvr is the key.
+Next: wire this env into gnome-shell/Mutter for GPU compositing, and
+into the Wayland session (which previously crashed on EGL init).
