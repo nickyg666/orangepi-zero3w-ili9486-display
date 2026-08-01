@@ -1,0 +1,11 @@
+[Unit]
+Description=Run cooling fan at full speed
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c "echo 1 > /sys/class/hwmon/hwmon2/pwm1_enable; echo 255 > /sys/class/hwmon/hwmon2/pwm1"
+
+[Install]
+WantedBy=multi-user.target
