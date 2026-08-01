@@ -1,16 +1,20 @@
-import os, time, sys
-fb=open("/dev/fb1","r+b")
-data=bytes([0x0F]*(960*640*4))
+import os, time, sys, glob
+fb=None
+for f in glob.glob("/sys/class/graphics/fb*"):
+    try:
+        if open(f+"/name").read().strip()=="ili9486drmfb": fb="/dev/"+os.path.basename(f); break
+    except: pass
+if not fb: print("no fb"); sys.exit(1)
 def spi(): return int(open("/sys/bus/spi/devices/spi3.0/statistics/bytes").read())
-fb.write(data); fb.flush()
-time.sleep(2)
+sz=os.path.getsize(fb); target=sz//2
+fh=open(fb,"r+b"); data=bytes([0x0F]*sz)
 for n in range(3):
-    b0=spi()
-    fb.seek(0); fb.write(data); fb.flush()
-    t0=time.time()
-    while time.time()-t0 < 5:
-        if spi()-b0 >= 300000: break
-        time.sleep(0.003)
+    b0=spi(); fh.seek(0); fh.write(data); fh.flush()
+    t0=time.time(); db=0
+    while time.time()-t0<5:
+        db=spi()-b0
+        if db>=target: break
+        time.sleep(0.004)
     dt=time.time()-t0
-    db=spi()-b0
-    print("frame %d: %d bytes in %.0f ms => %.1f fps" % (n, db, dt*1000, db/dt/307200), flush=True)
+    if db>0: print("frame %d: %d bytes in %.0f ms = %.1f fps" % (n,db,dt*1000,db/dt/target),flush=True)
+    else: print("frame %d: no activity" % n, flush=True)
