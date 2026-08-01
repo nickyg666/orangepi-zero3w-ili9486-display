@@ -123,9 +123,9 @@ static void waveshare_enable(struct drm_simple_display_pipe *pipe,
 	mipi_dbi_command(dbi, MIPI_DCS_EXIT_SLEEP_MODE);
 	msleep(250);
 
-	/* 0x66 = 18-bit RGB666 (262K colors); 0x55 = RGB565 (65K colors) */
-	mipi_dbi_set_rgb666(true);
-	mipi_dbi_command(dbi, MIPI_DCS_SET_PIXEL_FORMAT, 0x66);
+	/* 0x55 = RGB565 (65K colors). 18-bit RGB666 (0x66) caused artifacts. */
+	mipi_dbi_set_rgb666(false);
+	mipi_dbi_command(dbi, MIPI_DCS_SET_PIXEL_FORMAT, 0x55);
 
 	mipi_dbi_command(dbi, ILI9486_PWCTRL1, 0x44);
 

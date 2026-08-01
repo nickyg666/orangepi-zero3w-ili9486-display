@@ -843,7 +843,7 @@ static void ads7846_report_state(struct ads7846 *ts)
 
 	if (ts->model == 7843 || ts->model == 7845) {
 		Rt = ts->pressure_max / 2;
-	} else if (likely(x && z1)) {
+	} else if (likely(x && z1 > 1)) {
 		/* compute touch pressure resistance using equation #2 */
 		Rt = z2;
 		Rt -= z1;
@@ -857,15 +857,17 @@ static void ads7846_report_state(struct ads7846 *ts)
 	}
 
 	/*
-	 * Sample found inconsistent by debouncing or pressure is beyond
-	 * the maximum. Don't report it to user space, repeat at least
-	 * once more the measurement
+	 * Sample found inconsistent by debouncing. Don't reject on pressure
+	 * being above max: the plate resistance scaling can make Rt exceed
+	 * pressure_max for valid (light) touches, and dropping them makes the
+	 * panel feel insensitive. Clamp Rt for the reported pressure instead.
 	 */
-	if (packet->ignore || Rt > ts->pressure_max) {
-		dev_vdbg(&ts->spi->dev, "ignored %d pressure %d\n",
-			 packet->ignore, Rt);
+	if (packet->ignore) {
+		dev_vdbg(&ts->spi->dev, "ignored %d\n", packet->ignore);
 		return;
 	}
+	if (Rt > ts->pressure_max)
+		Rt = ts->pressure_max;
 
 	/*
 	 * Maybe check the pendown state before reporting. This discards
@@ -945,7 +947,7 @@ static irqreturn_t ads7846_irq(int irq, void *handle)
 			if (!ts->stopped)
 				ads7846_report_state(ts);
 
-			if (ts->packet->z1 <= ts->pressure_max / 16) {
+			if (ts->packet->z1 <= ts->pressure_max / 32) {
 				if (++no_press >= 3)
 					break;
 			} else {
