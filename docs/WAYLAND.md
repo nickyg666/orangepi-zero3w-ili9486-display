@@ -25,3 +25,25 @@
 - Investigate gdm-session.c display-server selection (needs gdm source).
 - Try disabling autologin: user session may inherit greeter's Wayland.
 - Try a custom Wayland session that gdm won't force to X11.
+
+## ROOT CAUSE FOUND (22:11)
+gnome-shell Wayland compositor SEGFAULTS (signal 11) during init:
+  - "Added device '/dev/dri/card2' (pvr) using non-atomic mode setting"
+  - "Added device '/dev/dri/card1' (ili9486) using atomic mode setting"
+  - "Added device '/dev/dri/card0' (sunxi-drm) using atomic mode setting"
+  - "[drm] sunxi-hdmi: drm hdmi detect: disconnect"
+  - "g_str_has_prefix: assertion 'str != NULL' failed" (x3)
+  - "Failed to get string: No error has been recorded."
+  - "Application 'org.gnome.Shell.desktop' killed by signal 11"
+
+The crash is triggered by the sunxi-drm HDMI (card0) DISCONNECT event:
+mutter reads a NULL mode/string from the disconnected HDMI connector and
+g_str_has_prefix() asserts -> segfault.
+
+## Fix directions (not yet applied)
+1. Make mutter ignore card0 (HDMI): no obvious env/gsetting; could try
+   removing master-of-seat udev tag from card0.
+2. Keep HDMI "connected" with a dummy mode so mutter doesn't hit the
+   disconnect path (driver-side).
+3. Patch mutter's g_str_has_prefix NULL guard (needs mutter source).
+4. Use X11 (current stable) and add GPU via a different path.
