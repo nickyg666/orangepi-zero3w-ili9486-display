@@ -1,12 +1,12 @@
 [Unit]
-Description=Force ILI9486 LCD CRTC commit at boot
+Description=Ensure ILI9486 LCD CRTC is committed at boot
 After=multi-user.target
-Wants=gdm.service
+Wants=display-manager.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c "sleep 5; chvt 2; sleep 1; chvt 1"
+ExecStart=/bin/sh -c "sleep 10; if grep -q \"enable=0\" /sys/kernel/debug/dri/1/state 2>/dev/null; then systemctl restart gdm3; sleep 10; fi; chvt 1"
 
 [Install]
 WantedBy=multi-user.target
