@@ -1,0 +1,12 @@
+[Unit]
+Description=Force ILI9486 LCD CRTC commit at boot
+After=multi-user.target
+Wants=gdm.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c "sleep 5; chvt 2; sleep 1; chvt 1"
+
+[Install]
+WantedBy=multi-user.target

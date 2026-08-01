@@ -2,10 +2,8 @@ import os, time, sys
 fb=open("/dev/fb1","r+b")
 data=bytes([0x0F]*(960*640*4))
 def spi(): return int(open("/sys/bus/spi/devices/spi3.0/statistics/bytes").read())
-# warm
 fb.write(data); fb.flush()
 time.sleep(2)
-# test 3 frames
 for n in range(3):
     b0=spi()
     fb.seek(0); fb.write(data); fb.flush()
