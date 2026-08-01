@@ -38,7 +38,6 @@
 #define ILI9486_PANEL_W		480
 #define ILI9486_PANEL_H		320
 #define ILI9486_DEFAULT_SCALE	3
-
 /*
  * The PiScreen/waveshare rpi-lcd-35 has a SPI to 16-bit parallel bus converter
  * in front of the  display controller. This means that 8-bit values have to be
@@ -207,7 +206,6 @@ static int ili9486_probe(struct spi_device *spi)
 	struct gpio_desc *dc;
 	u32 rotation = 0;
 	u32 scale;
-	unsigned int vw, vh;
 	int ret;
 
 	dbidev = devm_drm_dev_alloc(dev, &ili9486_driver,
@@ -236,22 +234,22 @@ static int ili9486_probe(struct spi_device *spi)
 	device_property_read_u32(dev, "scale", &scale);
 	if (scale < 1)
 		scale = 1;
+	dbidev->max_scale = scale;
 	dbidev->scale = scale;
 
-	vw = ILI9486_PANEL_W * scale;
-	vh = ILI9486_PANEL_H * scale;
+	/* base mode is the physical panel resolution */
 	mode.clock = 96000;
-	mode.hdisplay = vw;
-	mode.hsync_start = vw + 72;
-	mode.hsync_end = vw + 144;
-	mode.htotal = vw + 240;
-	mode.vdisplay = vh;
-	mode.vsync_start = vh + 1;
-	mode.vsync_end = vh + 4;
-	mode.vtotal = vh + 40;
+	mode.hdisplay = ILI9486_PANEL_W;
+	mode.hsync_start = ILI9486_PANEL_W + 72;
+	mode.hsync_end = ILI9486_PANEL_W + 144;
+	mode.htotal = ILI9486_PANEL_W + 240;
+	mode.vdisplay = ILI9486_PANEL_H;
+	mode.vsync_start = ILI9486_PANEL_H + 1;
+	mode.vsync_end = ILI9486_PANEL_H + 4;
+	mode.vtotal = ILI9486_PANEL_H + 40;
 	mode.width_mm = 74;
 	mode.height_mm = 49;
-	mode.type = DRM_MODE_TYPE_DRIVER;
+	mode.type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
 
 	ret = mipi_dbi_spi_init(spi, dbi, dc);
 	if (ret)

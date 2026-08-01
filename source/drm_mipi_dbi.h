@@ -113,6 +113,13 @@ struct mipi_dbi_dev {
 	unsigned int scale;
 
 	/**
+	 * @max_scale: highest selectable downscale factor. When > 1 the
+	 *             connector exposes one DRM mode per scale in
+	 *             [1, max_scale] so userspace can pick a resolution.
+	 */
+	unsigned int max_scale;
+
+	/**
 	 * @left_offset: Horizontal offset of the display relative to the
 	 *               controller's driver array
 	 */

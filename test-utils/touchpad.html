@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Touch Draw Pad</title>
+<style>
+  html, body { margin:0; padding:0; background:#222; overflow:hidden; height:100%; }
+  #grid { position:fixed; inset:0; background:
+     linear-gradient(#444 1px, transparent 1px) 0 0/32px 32px,
+     linear-gradient(90deg, #444 1px, transparent 1px) 0 0/32px 32px,
+     #222; }
+  canvas { position:fixed; inset:0; touch-action:none; }
+  #bar { position:fixed; top:0; left:0; right:0; z-index:10; background:rgba(0,0,0,0.7);
+     color:#fff; font:14px monospace; padding:4px 8px; display:flex; gap:8px; align-items:center; }
+  #coords { flex:1; }
+  #bar button { font:13px sans-serif; padding:3px 8px; border:1px solid #888; background:#444; color:#fff; cursor:pointer; }
+  #bigclear { position:fixed; bottom:0; left:0; right:0; height:48px; z-index:20;
+     background:rgba(80,0,0,0.8); color:#fff; font:16px sans-serif; border:none; cursor:pointer; }
+</style>
+</head>
+<body>
+<div id="grid"></div>
+<div id="bar">
+  <span id="coords">touch / draw here</span>
+  <button id="clear">Clear</button>
+  <button id="small">Small</button>
+  <button id="med">Med</button>
+  <button id="big">Big</button>
+</div>
+<canvas id="c"></canvas>
+<button id="bigclear">CLEAR</button>
+<script>
+  const cv = document.getElementById('c');
+  const ctx = cv.getContext('2d');
+  let W, H;
+  function resize() {
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = W; cv.height = H;
+    ctx.lineWidth = 4; ctx.strokeStyle = '#0f0'; ctx.lineCap='round'; ctx.lineJoin='round';
+  }
+  resize(); window.addEventListener('resize', resize);
+
+  const coords = document.getElementById('coords');
+  let drawing = false;
+  let last = null;
+  const scale = window.devicePixelRatio||1;
+
+  function pos(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left), y: (e.clientY - r.top) };
+  }
+  function show(e) {
+    const p = pos(e);
+    coords.textContent = `x=${Math.round(p.x)} y=${Math.round(p.y)} raw=(${Math.round(e.clientX)},${Math.round(e.clientY)}) rect=(${Math.round(cv.getBoundingClientRect().left)},${Math.round(cv.getBoundingClientRect().top)}) ${drawing?'DRAWING':''}`;
+  }
+  function dot(p, color) {
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, 6.283); ctx.fillStyle = color || '#0f0'; ctx.fill();
+  }
+  function down(e) {
+    drawing = true; last = pos(e);
+    dot(last, '#f00');  // red dot = press position
+    e.preventDefault();
+  }
+  function move(e) {
+    show(e);
+    const p = pos(e);
+    if (drawing && last) {
+      ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+      dot(p, '#0f0');
+    }
+    last = p;
+    e.preventDefault();
+  }
+  function up(e) { drawing = false; last = null; show(e); }
+
+  cv.addEventListener('mousedown', down);
+  cv.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', up);
+  cv.addEventListener('touchstart', e => { down(e.touches[0]); show(e.touches[0]); }, {passive:false});
+  cv.addEventListener('touchmove', e => { move(e.touches[0]); }, {passive:false});
+  cv.addEventListener('touchend', e => { up(e); });
+
+  document.getElementById('clear').onclick = () => { ctx.clearRect(0,0,W,H); };
+  document.getElementById('bigclear').onclick = () => { ctx.clearRect(0,0,W,H); };
+  document.getElementById('small').onclick = () => { ctx.lineWidth = 2; };
+  document.getElementById('med').onclick = () => { ctx.lineWidth = 6; };
+  document.getElementById('big').onclick = () => { ctx.lineWidth = 14; };
+</script>
+</body>
+</html>

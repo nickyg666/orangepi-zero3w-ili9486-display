@@ -33,7 +33,7 @@
 				interrupt-parent = <&pio>;
 				interrupts = <1 0 8>;			/* PB0 (GPIO 32), IRQ_TYPE_LEVEL_LOW */
 				pendown-gpios = <&pio 1 0 1>;		/* PB0 (GPIO 32), GPIO_ACTIVE_LOW */
-				ti,pressure-max = <255>;		/* libinput rejects ABS_PRESSURE min==max */
+				ti,pressure-max = <4095>;		/* 12-bit full-scale; <255> caused Rt>pressure_max drops */
 			};
 		};
 	};

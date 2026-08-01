@@ -905,9 +905,15 @@ static void ads7846_report_state(struct ads7846 *ts)
 
 static irqreturn_t ads7846_hard_irq(int irq, void *handle)
 {
-	struct ads7846 *ts = handle;
-
-	return get_pendown_state(ts) ? IRQ_WAKE_THREAD : IRQ_HANDLED;
+	/*
+	 * Always wake the threaded handler. The hard IRQ fires on the
+	 * (edge-triggered) nPENIRQ line; by the time it runs, the pin may
+	 * already have recovered from contact bounce, so gating on
+	 * get_pendown_state() here drops every sample. The threaded
+	 * handler re-checks the pendown state in its polling loop and the
+	 * pressure filter rejects false positives.
+	 */
+	return IRQ_WAKE_THREAD;
 }
 
 
@@ -1149,14 +1155,17 @@ static const struct ads7846_platform_data *ads7846_get_props(struct device *dev)
 	 * touchscreen-max-pressure gets parsed during
 	 * touchscreen_parse_properties()
 	 */
- 	device_property_read_u16(dev, "ti,pressure-min", &pdata->pressure_min);
+	device_property_read_u16(dev, "ti,pressure-min", &pdata->pressure_min);
 	if (!device_property_read_u32(dev, "touchscreen-min-pressure", &value))
 		pdata->pressure_min = (u16) value;
-	device_property_read_u16(dev, "ti,pressure-max", &pdata->pressure_max);
-	if (!pdata->pressure_max)
-		pdata->pressure_max = 255;	/* libinput rejects ABS_PRESSURE min==max */
-	dev_info(dev, "ads7846 props: model=%d x_max=%d y_max=%d p_max=%d\n",
-		 pdata->model, pdata->x_max, pdata->y_max, pdata->pressure_max);
+	/* ti,pressure-max is a 32-bit DT cell; reading it as u16 would grab
+	 * the high word (0x0000) and produce min == max, which makes
+	 * libinput reject the device. */
+	value = 0;
+	if (!device_property_read_u32(dev, "ti,pressure-max", &value))
+		pdata->pressure_max = (u16) value;
+	else if (!device_property_read_u32(dev, "touchscreen-max-pressure", &value))
+		pdata->pressure_max = (u16) value;
 
 	device_property_read_u16(dev, "ti,debounce-max", &pdata->debounce_max);
 	if (!device_property_read_u32(dev, "touchscreen-average-samples", &value))
@@ -1285,9 +1294,19 @@ static int ads7846_probe(struct spi_device *spi)
 			pdata->y_min ? : 0,
 			pdata->y_max ? : MAX_12BIT,
 			0, 0);
-	if (ts->model != 7845)
+	if (ts->model != 7845) {
+		u16 pressure_max = pdata->pressure_max;
+
+		/*
+		 * Ensure the axis has a non-zero range. libinput rejects
+		 * devices where ABS_PRESSURE min == max (0), so if the DT
+		 * value parsed as 0, fall back to a full-scale range.
+		 */
+		if (!pressure_max)
+			pressure_max = MAX_12BIT;
 		input_set_abs_params(input_dev, ABS_PRESSURE,
-				pdata->pressure_min, pdata->pressure_max, 0, 0);
+				pdata->pressure_min, pressure_max, 0, 0);
+	}
 
 	/*
 	 * Parse common framework properties. Must be done here to ensure the

@@ -1,0 +1,25 @@
+# Build artifacts
+*.o
+*.ko
+*.mod
+*.mod.c
+*.mod.o
+*.cmd
+Module.symvers
+modules.order
+
+# Logs and scratch
+*.log
+irq25.log
+pio_scan.log
+
+# Archives
+*.zip
+
+# Backups
+AGENTS.md.bak
+*.bak
+
+# Duplicate working copies of sources
+/dts-and-dtsi/
+/module-build/

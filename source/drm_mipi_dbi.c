@@ -265,17 +265,27 @@ static void mipi_dbi_scaled_fb_dirty(struct iosys_map *src,
 {
 	struct mipi_dbi_dev *dbidev = drm_to_mipi_dbi_dev(fb->dev);
 	struct mipi_dbi *dbi = &dbidev->dbi;
-	unsigned int scale = dbidev->scale;
-	unsigned int px1 = rect->x1 / scale;
-	unsigned int py1 = rect->y1 / scale;
-	unsigned int pw = DIV_ROUND_UP(rect->x2, scale) - px1;
-	unsigned int ph = DIV_ROUND_UP(rect->y2, scale) - py1;
-	const u8 *p = src->vaddr;
-	unsigned int pitch = fb->pitches[0];
-	u8 *tr = (u8 *)dbidev->tx_buf;
+	unsigned int scale;
+	unsigned int px1, py1, pw, ph;
+	const u8 *p;
+	unsigned int pitch;
+	u8 *tr;
 	unsigned int i, j, sx, sy, n;
 	u32 r, g, b;
 	int ret;
+
+	if (dbidev->mode.hdisplay)
+		scale = DIV_ROUND_UP(fb->width, dbidev->mode.hdisplay);
+	else
+		scale = 1;
+
+	px1 = rect->x1 / scale;
+	py1 = rect->y1 / scale;
+	pw = DIV_ROUND_UP(rect->x2, scale) - px1;
+	ph = DIV_ROUND_UP(rect->y2, scale) - py1;
+	p = src->vaddr;
+	pitch = fb->pitches[0];
+	tr = (u8 *)dbidev->tx_buf;
 
 	DRM_DEBUG_KMS("Flushing [FB:%d] " DRM_RECT_FMT " scaled %ux%u by %u\n",
 		      fb->base.id, DRM_RECT_ARG(rect), pw, ph, scale);
@@ -369,8 +379,17 @@ enum drm_mode_status mipi_dbi_pipe_mode_valid(struct drm_simple_display_pipe *pi
 					      const struct drm_display_mode *mode)
 {
 	struct mipi_dbi_dev *dbidev = drm_to_mipi_dbi_dev(pipe->crtc.dev);
+	unsigned int s;
 
-	return drm_crtc_helper_mode_valid_fixed(&pipe->crtc, mode, &dbidev->mode);
+	if (dbidev->max_scale <= 1)
+		return drm_crtc_helper_mode_valid_fixed(&pipe->crtc, mode, &dbidev->mode);
+
+	for (s = 1; s <= dbidev->max_scale; s++) {
+		if (mode->hdisplay == dbidev->mode.hdisplay * s &&
+		    mode->vdisplay == dbidev->mode.vdisplay * s)
+			return MODE_OK;
+	}
+	return MODE_BAD;
 }
 EXPORT_SYMBOL(mipi_dbi_pipe_mode_valid);
 
@@ -578,8 +597,35 @@ EXPORT_SYMBOL(mipi_dbi_pipe_destroy_plane_state);
 static int mipi_dbi_connector_get_modes(struct drm_connector *connector)
 {
 	struct mipi_dbi_dev *dbidev = drm_to_mipi_dbi_dev(connector->dev);
+	unsigned int s;
+	int n = 0;
 
-	return drm_connector_helper_get_modes_fixed(connector, &dbidev->mode);
+	if (dbidev->max_scale <= 1)
+		return drm_connector_helper_get_modes_fixed(connector, &dbidev->mode);
+
+	for (s = 1; s <= dbidev->max_scale; s++) {
+		struct drm_display_mode *mode;
+
+		mode = drm_mode_duplicate(connector->dev, &dbidev->mode);
+		if (!mode)
+			continue;
+		mode->hdisplay = dbidev->mode.hdisplay * s;
+		mode->hsync_start = dbidev->mode.hsync_start * s;
+		mode->hsync_end = dbidev->mode.hsync_end * s;
+		mode->htotal = dbidev->mode.htotal * s;
+		mode->vdisplay = dbidev->mode.vdisplay * s;
+		mode->vsync_start = dbidev->mode.vsync_start * s;
+		mode->vsync_end = dbidev->mode.vsync_end * s;
+		mode->vtotal = dbidev->mode.vtotal * s;
+		drm_mode_set_name(mode);
+		if (s == 1)
+			mode->type |= DRM_MODE_TYPE_PREFERRED;
+		else
+			mode->type |= DRM_MODE_TYPE_DRIVER;
+		drm_mode_probed_add(connector, mode);
+		n++;
+	}
+	return n;
 }
 
 static const struct drm_connector_helper_funcs mipi_dbi_connector_hfuncs = {
@@ -691,9 +737,11 @@ int mipi_dbi_dev_init_with_formats(struct mipi_dbi_dev *dbidev,
 
 	drm->mode_config.funcs = &mipi_dbi_mode_config_funcs;
 	drm->mode_config.min_width = dbidev->mode.hdisplay;
-	drm->mode_config.max_width = dbidev->mode.hdisplay;
 	drm->mode_config.min_height = dbidev->mode.vdisplay;
-	drm->mode_config.max_height = dbidev->mode.vdisplay;
+	drm->mode_config.max_width = dbidev->mode.hdisplay *
+				     (dbidev->max_scale ? dbidev->max_scale : 1);
+	drm->mode_config.max_height = dbidev->mode.vdisplay *
+				      (dbidev->max_scale ? dbidev->max_scale : 1);
 	dbidev->rotation = rotation;
 
 	DRM_DEBUG_KMS("rotation = %u\n", rotation);
