@@ -121,3 +121,18 @@ GL presentation still not working:
   - zink: reaches PowerVR but swapchain fails + fillModeNonSolid warning
   - pvr GLX: "failed to load driver swrast" / X_GLXCreateNewContext BadValue
 Note: modesetting X may strobe when GL clients crash during present attempts.
+
+## ROOT CAUSE of all Vulkan-swapchain failures: PowerVR WSI is 256x256 only
+vulkaninfo on the PowerVR BXM-4-64 surface:
+  minImageCount = 3
+  currentExtent  = 256x256 (FIXED)
+  minImageExtent = 256x256
+  maxImageExtent = 256x256 (implied)
+This is a HARD constraint of the PowerVR DRM WSI: no window can get a
+swapchain other than 256x256. Therefore:
+  - zink GL-over-Vulkan: swapchain must be 256x256, window is 960x640 -> fail
+  - Chromium ANGLE-on-Vulkan: same constraint -> cannot present fullscreen
+The GPU's only working path is OFFSCREEN (surfaceless) rendering -> FBO
+readback -> write fb (gpu_fbo.c proves this works at any size).
+=> The Vulkan window-presentation path is architecturally capped at 256x256
+   on this GPU/driver combo. Not fixable in userspace.
