@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PrismLauncher (Minecraft)
+Comment=PrismLauncher with account auth
+Exec=/home/orangepi/minecraft/prism-launch.sh
+Icon=/home/orangepi/minecraft/prism/share/icons/hicolor/256x256/apps/org.prismlauncher.PrismLauncher.png
+Terminal=false
+Categories=Game;
+StartupNotify=false
