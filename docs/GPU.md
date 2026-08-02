@@ -110,3 +110,14 @@ scale. This proves the hardware path; app integration is the next step.
   can present GPU-rendered WebGL to the X window even on fbdev.
 - This is the most viable GPU-windowed path on this setup. Desktop shortcuts:
   ~/Desktop/chromium-webgl-test.desktop (aquarium), chromium-gpu-info.desktop.
+
+## MODESETTING X ON CARD1 - WORKS (DRI3 enabled!)
+Config: /etc/X11/xorg.conf.d/10-lcd-modesetting.conf (modesetting on card1,
+AccelMethod none). Desktop now runs on modesetting driver with:
+  - DRI3 + Present + GLX initialized
+  - 960x640 on the SPI display
+This replaces the fbdev config. Key: DRI3 now EXISTS (was missing on fbdev).
+GL presentation still not working:
+  - zink: reaches PowerVR but swapchain fails + fillModeNonSolid warning
+  - pvr GLX: "failed to load driver swrast" / X_GLXCreateNewContext BadValue
+Note: modesetting X may strobe when GL clients crash during present attempts.
