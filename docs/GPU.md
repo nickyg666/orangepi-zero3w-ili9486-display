@@ -190,3 +190,14 @@ CORRECT paths:
   - gpu_drm_demo: takes DRM master (stop X), flips GPU frames -> WORKS (proven)
   - Alongside X: NOT possible via fb0. Would need X cooperation or a GPU
     compositor owning the display.
+
+## FINAL BLOCKER for DRI3/PRIME GPU offload: PowerVR has NO dumb buffers
+The modesetting driver requires dumb-buffer support for ANY use (screen or
+offload provider). card2 (PowerVR) has DUMB_BUFFER=0 -> modesetting crashes
+"KMS doesn't support dumb interface". So the GPU cannot be a modesetting
+offload provider, and DRI3 can't share GPU buffers with card1.
+card1 (SPI) now HAS PRIME (DRIVER_RENDER added) but needs the GPU to export
+buffers via modesetting, which the PowerVR can't (no dumb buffers).
+=> Full DRI3 windowed GPU rendering is NOT possible with this PowerVR driver.
+   The GPU works ONLY via its own EGL/Vulkan (surfaceless) rendering to
+   card1's framebuffer (gpu_drm_demo) - the proven standalone path.
