@@ -78,3 +78,15 @@ bypass mutter's broken EGL: render offscreen on GPU -> write fb -> SPI.
 Note: wrote a 480x320 frame into the 960x640 fb (top-left quadrant);
 a real app should render at 960x640 and box-filter, or the driver should
 scale. This proves the hardware path; app integration is the next step.
+
+## Minecraft/GLX GPU paths (tested)
+1. Native pvr GL (MESA_LOADER_DRIVER_OVERRIDE=pvr): works SURFACELESS
+   (offscreen FBO readback -> fb proven). FAILS GLX window: DRI2 auth /
+   X_GLXCreateNewContext BadValue on the fbdev X server.
+2. zink (GL-over-Vulkan, MESA_LOADER_DRIVER_OVERRIDE=zink): reaches PowerVR
+   (glxinfo shows "zink Vulkan 1.3 PowerVR BXM-4-64") but fails because the
+   GPU lacks fillModeNonSolid (zink base requirement) -> swapchain error.
+   Also "some incorrect rendering" warning.
+=> No GLX window path to the GPU on this setup. GPU usable offscreen only
+   (surfaceless + FBO readback -> write fb). Minecraft on llvmpipe; use
+   480x320 window (instance.cfg OverrideWindow) for 4x faster rendering.
