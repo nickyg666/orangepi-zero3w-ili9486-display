@@ -67,3 +67,14 @@ into the Wayland session (which previously crashed on EGL init).
   working (vendor stack gap) or mutter patched.
 - Current state: X11 desktop stable, llvmpipe GL (CPU). GPU usable via
   standalone Vulkan/GL apps with surfaceless+override=pvr.
+
+## PROVEN: GPU -> SPI framebuffer pipeline works
+test-utils/gpu_fbo.c renders a GL gradient on the PowerVR GPU (EGL
+surfaceless + pvr override), reads it back from an FBO, converts to RGB565,
+and writes to /dev/fb0 (which the mipi_dbi driver flushes to SPI).
+Output: "GPU GL: PowerVR B-Series BXM-4-64", readback gradient px[0]=160,142,71.
+This is the path for GPU-accelerated apps (video players, games) that
+bypass mutter's broken EGL: render offscreen on GPU -> write fb -> SPI.
+Note: wrote a 480x320 frame into the 960x640 fb (top-left quadrant);
+a real app should render at 960x640 and box-filter, or the driver should
+scale. This proves the hardware path; app integration is the next step.
