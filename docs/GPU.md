@@ -136,3 +136,14 @@ The GPU's only working path is OFFSCREEN (surfaceless) rendering -> FBO
 readback -> write fb (gpu_fbo.c proves this works at any size).
 => The Vulkan window-presentation path is architecturally capped at 256x256
    on this GPU/driver combo. Not fixable in userspace.
+
+## FINAL: native pvr GL GLX-window path is impossible
+The vendor GL stack (/usr/local/lib, Mesa 24.0.1) has EGL/GLES only - NO
+desktop libGL. So pvr_dri.so (24.0.1) can only be used via vendor EGL, not
+system GLX (23.2.1). Attempting GLX gives "DRI driver not from this Mesa
+build (24.0.1 vs 23.2.1)".
+Combined with the 256x256 Vulkan-WSI cap, the GPU CANNOT present to any
+desktop window (GLX or Vulkan). It can only render offscreen:
+  surfaceless EGL (pvr) or Vulkan -> FBO readback -> write /dev/fb0.
+That offscreen->fb path is PROVEN (gpu_fbo.c). Minecraft/windowed GPU GL
+is not achievable on this platform/driver combo.
