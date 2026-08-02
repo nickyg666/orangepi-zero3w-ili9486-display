@@ -3,7 +3,7 @@
 
 # mostly slop - but it does work. that's what matters to me. I don't care what it shits out as long as it works. is it maintainable? probably not. but lets be real. do you really care? maybe.
 
-Working ILI9486 3.5" SPI TFT (480x320, driven at **2x scale** as a 960x640 framebuffer for faster SPI refresh) with XPT2046/ADS7846 touchscreen on the Orange Pi Zero 3W (A733, sun60iw2 / 6.6.98-sun60iw2).
+Working ILI9486 3.5" SPI TFT (480x320, driven at **2x scale** as a 960x640 framebuffer for faster SPI refresh) (wrong, it's so all the elements from DE fit on display) with XPT2046/ADS7846 touchscreen on the Orange Pi Zero 3W (A733, sun60iw2 / 6.6.98-sun60iw2 vendor kernel).
 
 The module is the standard 3.5" RPi-LCD family (lcdwiki **MPI3501**, "rpi3501"), wired
 rev-A on the board's 26-pin header. The display works as a framebuffer console and under
@@ -16,7 +16,7 @@ X (fbdev). Touch: software stack is complete and live;
 - Framebuffer console on the panel (`fbcon=map:1` in `/boot/orangepiEnv.txt`)
 - X11 on the panel via fbdev driver (`10-fbdev-lcd.conf`)
 - ADS7846 touch driver with libinput-compatible pressure (`ti,pressure-max=<255>`)
-- Backlight: driver is backlight-aware; PWM overlay staged but not enabled (needs wiring)
+- Backlight: driver is backlight-aware; PWM overlay staged but not enabled (needs wiring, probably not capable but you can add a potentiometer to control amperage to panel LED lines)
 
 ## Pin Mapping (rev-A, verified vs Zero 3W schematic pg.17)
 
