@@ -101,6 +101,19 @@ struct mipi_dbi_dev {
 	u16 *tx_buf;
 
 	/**
+	 * @shadow: Shadow copy of the last frame sent to the panel (RGB565,
+	 *          panel resolution, wire byte order). Used to skip blocks
+	 *          whose content did not change, cutting SPI traffic.
+	 */
+	u8 *shadow;
+
+	/**
+	 * @shadow_scratch: Staging buffer for coalescing dirty runs before
+	 *                  sending them over SPI (16 rows x panel width).
+	 */
+	u8 *shadow_scratch;
+
+	/**
 	 * @rotation: initial rotation in degrees Counter Clock Wise
 	 */
 	unsigned int rotation;

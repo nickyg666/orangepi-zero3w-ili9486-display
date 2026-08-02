@@ -252,6 +252,20 @@ static void mipi_dbi_set_window_address(struct mipi_dbi_dev *dbidev,
 }
 
 /*
+ * mipi_dbi_shadow_flush - Send only the changed 16x16 blocks of a rect
+ *
+ * The new RGB565 pixels for a rect in panel coordinates (packed in tr with
+ * pitch pw*2) are diffed against dbidev->shadow, the last frame actually
+ * sent over SPI.  Contiguous changed blocks are coalesced into runs, packed
+ * contiguously in shadow_scratch and written with one window command each;
+ * shadow is updated.  Static content (desktops, animated-show backgrounds)
+ * becomes near-zero SPI traffic.
+ */
+static void mipi_dbi_shadow_flush(struct mipi_dbi_dev *dbidev, u8 *tr,
+				  unsigned int pw, unsigned int ph,
+				  unsigned int px1, unsigned int py1);
+
+/*
  * mipi_dbi_scaled_fb_dirty - Box-filter a damage rect down to the panel size
  *
  * Used when dbidev->scale > 1: the DRM mode is `scale` times the physical
@@ -318,12 +332,123 @@ static void mipi_dbi_scaled_fb_dirty(struct iosys_map *src,
 		}
 	}
 
-	mipi_dbi_set_window_address(dbidev, px1, px1 + pw - 1, py1, py1 + ph - 1);
-
-	ret = mipi_dbi_command_buf(dbi, MIPI_DCS_WRITE_MEMORY_START, tr, pw * ph * 2);
-	if (ret)
-		drm_err_once(fb->dev, "Failed to update display %d\n", ret);
+	mipi_dbi_shadow_flush(dbidev, tr, pw, ph, px1, py1);
 }
+
+/*
+ * mipi_dbi_shadow_flush - Send only the changed 16x16 blocks of a rect
+ *
+ * The new RGB565 pixels for a rect in panel coordinates (packed in tr with
+ * pitch pw*2) are diffed against dbidev->shadow, the last frame actually
+ * sent over SPI.  Contiguous changed blocks are coalesced into runs, packed
+ * contiguously in shadow_scratch and written with one window command each;
+ * shadow is updated.  Static content (desktops, animated-show backgrounds)
+ * becomes near-zero SPI traffic.
+ */
+static void mipi_dbi_shadow_flush(struct mipi_dbi_dev *dbidev, u8 *tr,
+				  unsigned int pw, unsigned int ph,
+				  unsigned int px1, unsigned int py1);
+
+static bool mipi_dbi_block_changed(u8 *tr, u8 *shadow, unsigned int pw,
+				   unsigned int sw, unsigned int px1,
+				   unsigned int py1, unsigned int by,
+				   unsigned int bx, unsigned int bw,
+				   unsigned int bh)
+{
+	unsigned int r;
+
+	for (r = 0; r < bh; r++) {
+		if (memcmp(tr + ((by + r) * pw + bx) * 2,
+			   shadow + ((py1 + by + r) * sw + px1 + bx) * 2,
+			   bw * 2))
+			return true;
+	}
+	return false;
+}
+
+static void mipi_dbi_shadow_flush(struct mipi_dbi_dev *dbidev, u8 *tr,
+				  unsigned int pw, unsigned int ph,
+				  unsigned int px1, unsigned int py1)
+{
+	struct mipi_dbi *dbi = &dbidev->dbi;
+	unsigned int sw = dbidev->mode.hdisplay;
+	unsigned int bx, by, bw, bh, r;
+	unsigned int run_x, run_w;
+	u8 *shadow = dbidev->shadow;
+	u8 *scratch = dbidev->shadow_scratch;
+	int ret;
+
+	if (!shadow || !scratch) {
+		mipi_dbi_set_window_address(dbidev, px1, px1 + pw - 1,
+					    py1, py1 + ph - 1);
+		ret = mipi_dbi_command_buf(dbi, MIPI_DCS_WRITE_MEMORY_START,
+					   tr, pw * ph * 2);
+		if (ret)
+			drm_err_once(&dbidev->drm,
+				     "Failed to update display %d\n", ret);
+		return;
+	}
+
+	for (by = 0; by < ph; by += 16) {
+		bh = min_t(unsigned int, 16, ph - by);
+		bx = 0;
+		while (bx < pw) {
+			while (bx < pw) {
+				bw = min_t(unsigned int, 16, pw - bx);
+				if (mipi_dbi_block_changed(tr, shadow, pw, sw,
+							   px1, py1, by, bx,
+							   bw, bh))
+					break;
+				bx += bw;
+			}
+			if (bx >= pw)
+				break;
+			run_x = bx;
+			run_w = 0;
+			while (bx < pw) {
+				bw = min_t(unsigned int, 16, pw - bx);
+				if (!mipi_dbi_block_changed(tr, shadow, pw, sw,
+							    px1, py1, by, bx,
+							    bw, bh))
+					break;
+				run_w += bw;
+				bx += bw;
+			}
+			for (r = 0; r < bh; r++) {
+				memcpy(scratch + r * run_w * 2,
+				       tr + ((by + r) * pw + run_x) * 2,
+				       run_w * 2);
+				memcpy(shadow + ((py1 + by + r) * sw +
+						 px1 + run_x) * 2,
+				       scratch + r * run_w * 2,
+				       run_w * 2);
+			}
+			mipi_dbi_set_window_address(dbidev, px1 + run_x,
+						    px1 + run_x + run_w - 1,
+						    py1 + by, py1 + by + bh - 1);
+			ret = mipi_dbi_command_buf(dbi,
+				MIPI_DCS_WRITE_MEMORY_START, scratch,
+				run_w * 2 * bh);
+			if (ret)
+				drm_err_once(&dbidev->drm,
+					     "Failed to update display %d\n", ret);
+		}
+	}
+}
+
+/*
+ * mipi_dbi_shadow_flush - Send only the changed 16x16 blocks of a rect
+ *
+ * The new RGB565 pixels for a rect in panel coordinates (packed in tr with
+ * pitch pw*2) are diffed against dbidev->shadow, the last frame actually
+ * sent over SPI.  Contiguous changed blocks are coalesced into runs, packed
+ * contiguously in shadow_scratch and written with one window command each;
+ * shadow is updated.  Static content (desktops, animated-show backgrounds)
+ * becomes near-zero SPI traffic.
+ */
+static void mipi_dbi_shadow_flush(struct mipi_dbi_dev *dbidev, u8 *tr,
+				  unsigned int pw, unsigned int ph,
+				  unsigned int px1, unsigned int py1);
 
 static void mipi_dbi_fb_dirty(struct iosys_map *src, struct drm_framebuffer *fb,
 			      struct drm_rect *rect)
@@ -715,12 +840,29 @@ int mipi_dbi_dev_init_with_formats(struct mipi_dbi_dev *dbidev,
 	if (!dbidev->tx_buf)
 		return -ENOMEM;
 
+	/*
+	 * Shadow buffer of the last-sent panel frame, at panel resolution
+	 * (after rotation), in RGB565 wire order.  `mode` is copied and
+	 * rotated below, so allocate after that.
+	 */
 	drm_mode_copy(&dbidev->mode, mode);
 	ret = mipi_dbi_rotate_mode(&dbidev->mode, rotation);
 	if (ret) {
 		DRM_ERROR("Illegal rotation value %u\n", rotation);
 		return -EINVAL;
 	}
+
+	dbidev->shadow = devm_kzalloc(drm->dev,
+				      dbidev->mode.hdisplay * dbidev->mode.vdisplay * 2,
+				      GFP_KERNEL);
+	if (!dbidev->shadow)
+		return -ENOMEM;
+
+	dbidev->shadow_scratch = devm_kzalloc(drm->dev,
+					      dbidev->mode.hdisplay * 16 * 2,
+					      GFP_KERNEL);
+	if (!dbidev->shadow_scratch)
+		return -ENOMEM;
 
 	drm_connector_helper_add(&dbidev->connector, &mipi_dbi_connector_hfuncs);
 	ret = drm_connector_init(drm, &dbidev->connector, &mipi_dbi_connector_funcs,
