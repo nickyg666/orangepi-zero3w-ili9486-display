@@ -1,12 +1,14 @@
 # ILI9486 SPI Display Support for Orange Pi Zero 3W
 
+
+# mostly slop - but it does work. that's what matters to me. I don't care what it shits out as long as it works. is it maintainable? probably not. but lets be real. do you really care? maybe.
+
 Working ILI9486 3.5" SPI TFT (480x320, driven at **2x scale** as a 960x640 framebuffer for faster SPI refresh) with XPT2046/ADS7846 touchscreen on the Orange Pi Zero 3W (A733, sun60iw2 / 6.6.98-sun60iw2).
 
 The module is the standard 3.5" RPi-LCD family (lcdwiki **MPI3501**, "rpi3501"), wired
 rev-A on the board's 26-pin header. The display works as a framebuffer console and under
 X (fbdev). Touch: software stack is complete and live; 
-**Second display**: HDMI (fb0) works out of the box — `con2fbmap 2 0` maps tty2 to HDMI, switch with Ctrl+Alt+F2.
-
+**Second display**: HDMI (fb0) does not work
 ## Features
 
 - TinyDRM kernel module (`ili9486` + `drm_mipi_dbi`) — built for 6.6.98-sun60iw2
@@ -171,7 +173,7 @@ Driver sources here are the **modified** versions used on the board:
 - **Touch rejected by libinput**: ensure `ti,pressure-max` present (or use the driver
   fallback build).
 
-## License
+## License ( I told it to use the "ching-a-ling" attribution which I made up on the spot, this is what it put)
 
 Provided as-is for educational and personal use. Kernel driver code derives from
 Linux (GPL) — see the kernel tree for the original ili9486/drm_mipi_dbi/ads7846 drivers.
