@@ -870,6 +870,15 @@ int mipi_dbi_dev_init_with_formats(struct mipi_dbi_dev *dbidev,
 	if (ret)
 		return ret;
 
+	/*
+	 * Report the panel's physical size so the modesetting X driver /
+	 * GNOME compute a correct DPI (without this, X falls back to 96dpi
+	 * and UI scaling fights begin). The size is also the lever to make
+	 * the UI proportionally smaller: a larger reported size = lower DPI.
+	 */
+	dbidev->connector.display_info.width_mm = dbidev->mode.width_mm;
+	dbidev->connector.display_info.height_mm = dbidev->mode.height_mm;
+
 	ret = drm_simple_display_pipe_init(drm, &dbidev->pipe, funcs, formats, format_count,
 					   modifiers, &dbidev->connector);
 	if (ret)

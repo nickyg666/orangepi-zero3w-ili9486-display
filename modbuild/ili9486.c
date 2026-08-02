@@ -248,8 +248,15 @@ static int ili9486_probe(struct spi_device *spi)
 	mode.vsync_start = ILI9486_PANEL_H + 1;
 	mode.vsync_end = ILI9486_PANEL_H + 4;
 	mode.vtotal = ILI9486_PANEL_H + 40;
-	mode.width_mm = 74;
-	mode.height_mm = 49;
+	/*
+	 * Reported physical size drives GNOME's DPI / UI scaling.
+	 * Actual panel is 74x49mm (~165dpi). Reporting a LARGER virtual
+	 * size lowers the DPI so all UI elements scale down proportionally
+	 * (smaller fonts, icons, panels) to fit 480x320 - without needing
+	 * font-scale < 1.0. 150x100mm => ~81dpi.
+	 */
+	mode.width_mm = 150;
+	mode.height_mm = 100;
 	mode.type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
 
 	ret = mipi_dbi_spi_init(spi, dbi, dc);
