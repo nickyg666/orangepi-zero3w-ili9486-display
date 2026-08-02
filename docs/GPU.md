@@ -160,3 +160,14 @@ is not achievable on this platform/driver combo.
 - CONCLUSION: NO GPU window presentation is possible on this setup (no
   functional DRI3, 256x256 Vulkan-WSI cap, no vendor libGL for GLX).
   GPU works ONLY offscreen (surfaceless -> FBO -> write fb), proven.
+
+## GPU -> SPI DISPLAY AS A CARD DEVICE - WORKS (gpu_drm_demo.c)
+When X is stopped (DRM master free), gpu_drm_demo:
+  1. Renders animated frames on PowerVR (surfaceless EGL, 960x640)
+  2. Copies GPU output into a card1 dumb-buffer framebuffer
+  3. Flips the CRTC -> mipi_dbi flushes to SPI
+SPI stats jumped ~1.1 billion bytes during the run => frames reached the panel.
+This proves the GPU can drive the SPI display directly as a card device.
+Test: systemctl stop gdm3; run gpu_drm_demo; systemctl start gdm3 to restore.
+The demo takes over the screen while running (X stopped). Startup X config is
+untouched so the desktop always returns on reboot.
