@@ -90,3 +90,15 @@ scale. This proves the hardware path; app integration is the next step.
 => No GLX window path to the GPU on this setup. GPU usable offscreen only
    (surfaceless + FBO readback -> write fb). Minecraft on llvmpipe; use
    480x320 window (instance.cfg OverrideWindow) for 4x faster rendering.
+
+## GLAMOR/modesetting experiment (tested)
+- modesetting driver on card1 (SPI, ili9486): sees "Unknown19-1" output, probed
+  modes OK, but glamor initialization FAILS on card1 (mipi_dbi has no GPU).
+- modesetting driver on card0/GPU: "glamor X acceleration enabled on PowerVR
+  B-Series BXM-4-64" - GLAMOR DOES init on the PowerVR via modesetting!
+- But screen binds to card1 (display), which can't glamor -> "no screens found".
+- CONCLUSION: GPU (card2) and display (card1) are SEPARATE DRM devices. To use
+  GPU glamor for the SPI display, the GPU would need to render INTO card1's
+  framebuffer - complex cross-device setup not feasible here.
+- zink needs DRI3 for presentation; fbdev X has no DRI3 -> GPU GL can't present
+  to windows on this display. pvr GL works offscreen only (surfaceless).
