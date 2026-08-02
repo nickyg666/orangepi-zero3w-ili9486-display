@@ -171,3 +171,11 @@ This proves the GPU can drive the SPI display directly as a card device.
 Test: systemctl stop gdm3; run gpu_drm_demo; systemctl start gdm3 to restore.
 The demo takes over the screen while running (X stopped). Startup X config is
 untouched so the desktop always returns on reboot.
+
+## GPU renders alongside desktop (no X kill needed) - VERIFIED
+With modesetting X on card1, /dev/fb0 maps to the ACTIVE scanout. So:
+  gpu_demo (PowerVR offscreen render) -> write /dev/fb0 -> mipi_dbi flush -> SPI.
+Verified: SPI +24,580 bytes in 2s while X was running; desktop stayed up.
+This is the integration path: GPU-accelerated apps render offscreen on the
+PowerVR and present to the SPI display by writing the scanout fb, coexisting
+with the X desktop. gpu_demo.c and gpu_drm_demo.c demonstrate both modes.
