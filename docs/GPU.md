@@ -147,3 +147,16 @@ desktop window (GLX or Vulkan). It can only render offscreen:
   surfaceless EGL (pvr) or Vulkan -> FBO readback -> write /dev/fb0.
 That offscreen->fb path is PROVEN (gpu_fbo.c). Minecraft/windowed GPU GL
 is not achievable on this platform/driver combo.
+
+## DRI3 on modesetting X is initialized but NOT functional
+- modesetting X on card1 logs "Initializing extension DRI3" but
+  `xdpyinfo -ext DRI3` reports NOT supported. DRI3 needs a functioning
+  PRIME render-GPU provider; the PowerVR (card2) is a separate device not
+  wired as a provider to card1. So DRI3 is advertised but can't hand out
+  buffers.
+- Chromium ANGLE-on-Vulkan still fails: "dri3 extension not supported" +
+  "Failed to create vulkan surface". Its gpu-process also doesn't inherit
+  VK_ICD_FILENAMES (spawned with clean env).
+- CONCLUSION: NO GPU window presentation is possible on this setup (no
+  functional DRI3, 256x256 Vulkan-WSI cap, no vendor libGL for GLX).
+  GPU works ONLY offscreen (surfaceless -> FBO -> write fb), proven.
