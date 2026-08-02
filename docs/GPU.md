@@ -102,3 +102,11 @@ scale. This proves the hardware path; app integration is the next step.
   framebuffer - complex cross-device setup not feasible here.
 - zink needs DRI3 for presentation; fbdev X has no DRI3 -> GPU GL can't present
   to windows on this display. pvr GL works offscreen only (surfaceless).
+
+## Chromium WebGL (ANGLE-on-Vulkan) - WORKS
+- chromium with --use-gl=angle --use-angle=vulkan --enable-features=Vulkan
+  - GPU process opens /dev/dri/renderD128 (pvr) - confirmed via /proc fds.
+- This bypasses GLX/DRI3 entirely (Chromium uses its own Vulkan WSI), so it
+  can present GPU-rendered WebGL to the X window even on fbdev.
+- This is the most viable GPU-windowed path on this setup. Desktop shortcuts:
+  ~/Desktop/chromium-webgl-test.desktop (aquarium), chromium-gpu-info.desktop.
