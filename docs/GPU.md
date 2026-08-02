@@ -201,3 +201,18 @@ buffers via modesetting, which the PowerVR can't (no dumb buffers).
 => Full DRI3 windowed GPU rendering is NOT possible with this PowerVR driver.
    The GPU works ONLY via its own EGL/Vulkan (surfaceless) rendering to
    card1's framebuffer (gpu_drm_demo) - the proven standalone path.
+
+## FOREST-LEVEL: why ANGLE/DRI3 can't work on the SPI display
+Incipiens (HDMI display, sunxi-drm) got Chromium ANGLE-on-Vulkan working:
+  - Xorg on the HDMI DRM node (sunxi-drm) with a working DRI3/Present path
+    serviced by the display controller.
+  - Chromium's ANGLE creates a Vulkan WSI surface on X (needs DRI3/Present).
+Our SPI display (mipi_dbi, card1) has NO display controller / presentation
+engine - every frame is a software full-frame SPI flush. modesetting X here:
+  - Initializes DRI3/Present but they're NOT advertised to clients (no
+    GPU-backed glamor/EGL to service them) - confirmed: xdpyinfo says
+    "not supported" despite "Initializing extension DRI3" in the log.
+  - So ANGLE's Vulkan surface creation fails ("Failed to create vulkan surface").
+This is a hardware difference (SPI panel vs HDMI), not a config error.
+The working GPU path on SPI: render offscreen (surfaceless EGL/Vulkan) ->
+write the scanout fb (gpu_drm_demo) - no X DRI3 needed.
