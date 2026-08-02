@@ -21,9 +21,6 @@
 #include <drm/drm_gem_dma_helper.h>
 #include <drm/drm_managed.h>
 #include <drm/drm_mipi_dbi.h>
-
-/* Set by drm_mipi_dbi.ko (out-of-tree module cannot extend struct mipi_dbi). */
-void mipi_dbi_set_rgb666(bool enable);
 #include <drm/drm_modeset_helper.h>
 
 #define ILI9486_ITFCTR1         0xb0
@@ -123,8 +120,6 @@ static void waveshare_enable(struct drm_simple_display_pipe *pipe,
 	mipi_dbi_command(dbi, MIPI_DCS_EXIT_SLEEP_MODE);
 	msleep(250);
 
-	/* 0x55 = RGB565 (65K colors). 18-bit RGB666 (0x66) caused artifacts. */
-	mipi_dbi_set_rgb666(false);
 	mipi_dbi_command(dbi, MIPI_DCS_SET_PIXEL_FORMAT, 0x55);
 
 	mipi_dbi_command(dbi, ILI9486_PWCTRL1, 0x44);
@@ -174,7 +169,8 @@ static const struct drm_simple_display_pipe_funcs waveshare_pipe_funcs = {
 DEFINE_DRM_GEM_DMA_FOPS(ili9486_fops);
 
 static const struct drm_driver ili9486_driver = {
-	.driver_features	= DRIVER_GEM | DRIVER_MODESET | DRIVER_ATOMIC,
+	.driver_features	= DRIVER_GEM | DRIVER_MODESET | DRIVER_ATOMIC |
+				  DRIVER_RENDER,
 	.fops			= &ili9486_fops,
 	DRM_GEM_DMA_DRIVER_OPS_VMAP,
 	.debugfs_init		= mipi_dbi_debugfs_init,

@@ -169,7 +169,8 @@ static const struct drm_simple_display_pipe_funcs waveshare_pipe_funcs = {
 DEFINE_DRM_GEM_DMA_FOPS(ili9486_fops);
 
 static const struct drm_driver ili9486_driver = {
-	.driver_features	= DRIVER_GEM | DRIVER_MODESET | DRIVER_ATOMIC,
+	.driver_features	= DRIVER_GEM | DRIVER_MODESET | DRIVER_ATOMIC |
+				  DRIVER_RENDER,
 	.fops			= &ili9486_fops,
 	DRM_GEM_DMA_DRIVER_OPS_VMAP,
 	.debugfs_init		= mipi_dbi_debugfs_init,
