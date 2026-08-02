@@ -179,3 +179,14 @@ Verified: SPI +24,580 bytes in 2s while X was running; desktop stayed up.
 This is the integration path: GPU-accelerated apps render offscreen on the
 PowerVR and present to the SPI display by writing the scanout fb, coexisting
 with the X desktop. gpu_demo.c and gpu_drm_demo.c demonstrate both modes.
+
+## CORRECTION: gpu_demo via /dev/fb0 does NOT display alongside X
+The CRTC scans out Xorg's buffer (fb=38, dma 0xffa00000). /dev/fb0 maps to
+the fbcon buffer (fb=36, dma 0xff700000), which is NOT scanned out, and /dev/fb0
+reports size 0 under modesetting X. So writing GPU frames to /dev/fb0 does
+nothing visible (the SPI bytes observed were X's own redraws). X's scanout
+GEM has no exported name, so external processes can't write into it.
+CORRECT paths:
+  - gpu_drm_demo: takes DRM master (stop X), flips GPU frames -> WORKS (proven)
+  - Alongside X: NOT possible via fb0. Would need X cooperation or a GPU
+    compositor owning the display.
