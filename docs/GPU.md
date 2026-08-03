@@ -216,3 +216,46 @@ engine - every frame is a software full-frame SPI flush. modesetting X here:
 This is a hardware difference (SPI panel vs HDMI), not a config error.
 The working GPU path on SPI: render offscreen (surfaceless EGL/Vulkan) ->
 write the scanout fb (gpu_drm_demo) - no X DRI3 needed.
+
+## UPDATE (2026-08-03): zink GLX presentation WORKS via software-present fallback
+
+The old conclusion ("GL desktop compositing via GPU not feasible") is OUTDATED.
+
+### The fix: MESA_VK_WSI_DEBUG=sw
+- Problem: zink presents GLX windows via the Vulkan X11 WSI, which requires the
+  DRI3 X extension. This SPI-panel X server initializes DRI3 internally but
+  never exposes it to clients ("screen 0 is not DRI2 capable" - no glamor/GBM
+  on the ili9486 SPI DRM device). Result: "could not create swapchain",
+  GLX window apps die at window creation.
+- Glamor attempt FAILS: modesetting + AccelMethod glamor hangs Xorg at
+  glamoregl init (no hardware EGL/GBM scanout path on the SPI panel).
+- FIX: `export MESA_VK_WSI_DEBUG=sw` (Mesa WSI debug flag WSI_DEBUG_SW in
+  src/vulkan/wsi/wsi_common.c:82). This forces the software present path
+  (`x11_present_to_x11_sw`, XShmPutImage-based) which needs NO DRI3.
+- Verified: `glxinfo -B` with zink + MESA_VK_WSI_DEBUG=sw reports
+  "Device: zink Vulkan 1.3(PowerVR B-Series BXM-4-64 MC1), Accelerated: yes"
+  and GLX window swapbuffers works (glxswaptest.c).
+
+### Minecraft (NeoForge 26.1.2) on the GPU - WORKING
+- PrismLauncher instance 26.1.2, Java 25 (java-runtime-epsilon)
+- Launch: /home/orangepi/minecraft/game-run.sh -l 26.1.2
+  env: MESA_LOADER_DRIVER_OVERRIDE=zink MESA_GL_VERSION_OVERRIDE=4.5
+       MESA_VK_WSI_DEBUG=sw ALSOFT_DRIVERS=null
+- OpenAL: libopenal.so segfaults in alcGetString enumerating devices with no
+  audio server (hs_err: SoundEngine -> DeviceList.query). Fix: ALSOFT_DRIVERS=null.
+- NeoForge early splash window needs GLX -> disable in fml.toml:
+  earlyWindowControl = false
+- Window: options.txt overrideWidth 960 overrideHeight 640 (fills 960x640
+  desktop, downscaled 2x to panel), guiScale 1 (smallest UI so oak
+  keyboard / GNOME OSK fit), fullscreen false, maxFps 60, vsync off.
+- PrismLauncher refuses root; launch via su - orangepi (launch-detached.sh).
+
+### Scale=2 supersampling (whole desktop)
+- DT overlay sun60i-a733-ili9486.dts: scale = <2> -> DRM exposes 960x640
+  virtual mode; mipi_dbi_scaled_fb_dirty box-filters 2x down to the 480x320
+  GRAM. Every UI element renders at double res and appears HALF physical size
+  (GNOME OSK + Minecraft UI fit on the panel). Free antialiasing; the GPU
+  does the heavy lifting. Full-frame SPI = 1.23MB but shadow-diff flush only
+  sends changed 16x16 blocks.
+- X config: /etc/X11/xorg.conf.d/10-lcd-modesetting.conf Modes "960x640",
+  DisplaySize 812 541 (keeps 30dpi effective after 2x downscale).
