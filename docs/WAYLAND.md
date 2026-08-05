@@ -1,78 +1,34 @@
-# Wayland on the ILI9486 SPI display
+# Wayland status
 
-## Status: WORKING at greeter level, user session forced to X11 by gdm
+## RESOLVED (2026-08-05): Wayland works on the virtual display
 
-## What works
-- gnome-shell (mutter 42.9) STARTS as a Wayland display server on the SPI
-  display (card1). Verified: "Running GNOME Shell as a Wayland display server".
-- The gdm greeter runs as Wayland when WaylandEnable=true.
+The old blocker was mutter segfaulting on the SPI-panel X session when the
+sunxi-drm HDMI connector emitted a disconnect event (g_str_has_prefix NULL
+assert). The whole display architecture has since moved to "virtual display +
+mirror", so the panel no longer runs a compositor directly - the virtual
+display does, and spi-mirror copies it to the panel.
 
-## The blocker
-- With autologin, the USER session always launches via gdm-x-session (X11),
-  even though the greeter ran Wayland. gdm-session-worker only checks the
-  session file location (/usr/share/wayland-sessions/); the display-server
-  selection for the user session falls back to X11.
-- gdm 42.0. Env vars seen: XDG_DATA_DIRS=/usr/share/ubuntu-wayland (session
-  is recognized as wayland) but gdm-x-session is spawned.
+## Current setup (all systemd services, auto-start at boot)
 
-## Tests done
-- Manual: `gnome-shell --wayland` with X stopped -> EBUSY (X held DRM).
-- Manual: gdm-wayland-session wrapper -> started, CRTC committed.
-- gdm restart with WaylandEnable=true -> greeter ran Wayland (22:05:44),
-  user session went X11 3s later (22:05:47).
+- xvfb-virtual-display.service : Xvfb :1 at 1920x1080x24 (the "dummy display",
+  always present regardless of physical hardware)
+- weston-virtual.service       : Weston 9 Wayland compositor ON :1 (x11 backend,
+  gl renderer), socket /run/user/1000/wayland-0
+- spi-mirror.service           : grabs :1 root window, box-filters 1920x1080 ->
+  480x320 RGB565, writes to /dev/fb-lcd; kernel shadow-diff pushes changed
+  blocks over SPI
 
-## Next steps (not done)
-- Investigate gdm-session.c display-server selection (needs gdm source).
-- Try disabling autologin: user session may inherit greeter's Wayland.
-- Try a custom Wayland session that gdm won't force to X11.
+## Using Wayland apps
 
-## ROOT CAUSE FOUND (22:11)
-gnome-shell Wayland compositor SEGFAULTS (signal 11) during init:
-  - "Added device '/dev/dri/card2' (pvr) using non-atomic mode setting"
-  - "Added device '/dev/dri/card1' (ili9486) using atomic mode setting"
-  - "Added device '/dev/dri/card0' (sunxi-drm) using atomic mode setting"
-  - "[drm] sunxi-hdmi: drm hdmi detect: disconnect"
-  - "g_str_has_prefix: assertion 'str != NULL' failed" (x3)
-  - "Failed to get string: No error has been recorded."
-  - "Application 'org.gnome.Shell.desktop' killed by signal 11"
+    export XDG_RUNTIME_DIR=/run/user/1000
+    export WAYLAND_DISPLAY=wayland-0
+    weston-terminal     # or any Wayland-native app
 
-The crash is triggered by the sunxi-drm HDMI (card0) DISCONNECT event:
-mutter reads a NULL mode/string from the disconnected HDMI connector and
-g_str_has_prefix() asserts -> segfault.
+Everything shows up on the SPI panel via spi-mirror.
 
-## Fix directions (not yet applied)
-1. Make mutter ignore card0 (HDMI): no obvious env/gsetting; could try
-   removing master-of-seat udev tag from card0.
-2. Keep HDMI "connected" with a dummy mode so mutter doesn't hit the
-   disconnect path (driver-side).
-3. Patch mutter's g_str_has_prefix NULL guard (needs mutter source).
-4. Use X11 (current stable) and add GPU via a different path.
+## Notes
 
-## Status: BLOCKED on mutter segfault
-No mutter env/gsetting exists to exclude a DRM device. udev TAG- can't
-strip seat tags (71-seat.rules re-adds them). Fix needs a mutter patch
-or sunxi-drm driver workaround for the HDMI disconnect path.
-X11 remains the stable display path.
-
-## Binary-level root cause (gdb on core dump)
-Crash: SIGSEGV in g_strjoinv, called from libmutter-10.so.0 at offset 0x1700a4.
-The joined string is the tail of "Failed to get string: No error has been recorded."
-= mutter's KMS backend error-path builds a diagnostic string with a NULL
-GError->message, from a failed udev/DRM property read on sunxi-drm (card0).
-libmutter text base 0x7f87980000 (from core). Format string "Failed to get
-string: %s" at rodata 0x1b5710.
-=> Fix needs: mutter source patch (NULL-guard the error message) OR sunxi-drm
-driver fix (return valid property/error). Neither source is on the system.
-User can help locate: mutter 42 source (gitlab.gnome.org/GNOME/mutter) or
-allwinner sunxi-drm display driver source (linux-6.6 BSP).
-
-## UNIFIED ROOT CAUSE (wayland + GPU)
-The mutter Wayland crash (g_strjoinv "Failed to get string") is in mutter's
-EGL/GL init path (disasm shows eglDestroyContext nearby, offsets 0x170090).
-It's triggered by the SAME broken GL stack as the GPU problem: vendor Mesa
-24.0.1 (/usr/local/lib) vs system Mesa 23.2.1 mismatch. mutter Wayland init
-tries EGL, hits the broken config, and crashes building an error string.
-=> Fixing the vendor GL stack fixes BOTH Wayland and GPU. Priorities:
-  1. Get ONE consistent GL stack (vendor pvr_dri.so under a matching Mesa)
-  2. OR get zink_dri.so matching the vendor EGL version
-  3. THEN mutter Wayland init won't crash on EGL, and DRI3 enables pvr.
+- Weston on :1 uses softpipe (CPU) for its GL renderer unless zink is made
+  findable in /usr/local/lib/dri. GPU apps (Minecraft via zink GLX on :1) still
+  render on the PowerVR; the compositor blit is the only CPU part.
+- The old mutter-on-SPI approach is abandoned; do not reintroduce it.
