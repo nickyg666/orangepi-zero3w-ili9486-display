@@ -1,13 +1,13 @@
 [Unit]
-Description=Mirror virtual display :1 onto ILI9486 SPI panel
+Description=Mirror primary display onto ILI9486 SPI panel
 After=xvfb-virtual-display.service display-manager.service
+Wants=xvfb-virtual-display.service
 
 [Service]
 Type=simple
-ExecStart=/home/orangepi/spi-mirror :1
+ExecStart=/usr/local/bin/spi-mirror-select.sh
 Restart=always
 RestartSec=5
-Environment=DISPLAY=:1
 
 [Install]
 WantedBy=multi-user.target

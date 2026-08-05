@@ -1,6 +1,6 @@
 #!/bin/bash
-# Launch Minecraft (NeoForge 26.1.2) via PrismLauncher with zink/PowerVR GPU accel
-# Fixes: OpenAL null driver (audio enum segfault), native 480x320 display
+# Launch Minecraft on the real X display (:0, HDMI/DP + SPI). zink renders
+# on the PowerVR GPU; the SPI panel shows a copy via spi-mirror.
 export DISPLAY=:0
 export XAUTHORITY=/run/user/1000/gdm/Xauthority
 export ALSOFT_CONF=/home/orangepi/.config/openal/alsoft.conf
