@@ -64,6 +64,17 @@ The display stack is "virtual display + mirror":
   (GL→Vulkan); `MESA_VK_WSI_DEBUG=sw` forces Mesa's software-present fallback
   (XShmPutImage) because this X stack has NO DRI3 (glamor hangs on both card0 and
   card1 — hardware/driver lock, do not retry).
+  - **Instances**: 26.1.2 (NeoForge, modded) and 26.2 (vanilla). 26.2 has a native
+    Vulkan backend (`com/mojang/blaze3d/vulkan/*`, `PreferredGraphicsApi` enum:
+    DEFAULT/OPENGL/VULKAN) selected via `options.txt` `preferredGraphicsBackend`.
+  - **DO NOT select VULKAN on 26.2** — the native IMG ICD (`libVK_IMG.so`) cannot
+    present on this stack: no DRI3 + 256x256 hard WSI cap (see docs/GPU.md), and
+    `MESA_VK_WSI_DEBUG=sw` on the native path segfaults during swapchain creation
+    (verified with vkpresent_test). Force `preferredGraphicsBackend:"opengl"` so it
+    uses the proven zink path. Same for 26.1.2.
+  - **Both instances tuned for the weak PowerVR**: windowed 854x480, maxFps 45,
+    renderDistance 8, guiScale 1 (was 1920x1080 fullscreen / maxFps 120 → slideshow).
+  - Launch a specific instance: `minecraft/launch-detached.sh <instance>` (default 26.1.2).
 
 ### Wayland
 
@@ -101,6 +112,14 @@ longer runs a compositor. Do not reintroduce mutter on the SPI panel.
 - **libopenal segfaults** enumerating devices with no audio server: `ALSOFT_DRIVERS=null`.
 - **NeoForge early splash window kills zink** (needs GLX): `fml.toml`
   `earlyWindowControl = false`.
+- **PowerVR native Vulkan ICD (libVK_IMG.so) enumerates but CANNOT present to
+  windows** — no DRI3 on this X stack, 256x256 hard WSI swapchain cap, and the
+  `MESA_VK_WSI_DEBUG=sw` software-present hack segfaults on the native path (only
+  zink's sw-present works). Don't try to "fix" native Vulkan presentation; it is a
+  driver/hardware limit. See docs/GPU.md.
+- **Vulkan only lists PowerVR when the native ICD is the first device**; a plain
+  `vulkaninfo` shows PowerVR BXM-4-64 MC1 (integrated) first, llvmpipe second.
+  Rendering (offscreen/surfaceless) works; windowed present does not.
 - **sudo**: `SUDO_ASKPASS=/home/orangepi/.opencode-askpass sudo -A <cmd>`.
 - **Heredocs via `sudo -A bash -c` eat $variables** — write files with the Write
   tool, or single-quote the heredoc delimiter.
