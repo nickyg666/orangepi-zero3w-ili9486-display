@@ -74,6 +74,16 @@ The display stack is "virtual display + mirror":
     uses the proven zink path. Same for 26.1.2.
   - **Both instances tuned for the weak PowerVR**: windowed 854x480, maxFps 45,
     renderDistance 8, guiScale 1 (was 1920x1080 fullscreen / maxFps 120 → slideshow).
+  - **26.2 (vanilla) BOOTS OFFLINE on the GPU** — confirmed 2026-08-06: java runs,
+    `Backend library: LWJGL 3.4.1+2`, `Using graphics backend OpenGL, drivers 4.5
+    (Core Profile) Mesa 23.2.1`, `Using graphics device: zink Vulkan 1.3 (PowerVR
+    B-Series BXM-4-64 MC1 (IMAGINATION_PROPRIETARY))`, window "Minecraft 26.2"
+    854x480 on :0, SPI mirror active, stable (vanilla has no NeoForge auth dep).
+    Launch with `--offline orangepi`:
+    `./PrismLauncher --launch 26.2 --offline orangepi` (env: MESA_LOADER_DRIVER_OVERRIDE=zink
+    MESA_GL_VERSION_OVERRIDE=4.5 MESA_VK_WSI_DEBUG=sw EGL_PLATFORM=x11 ALSOFT_DRIVERS=null).
+  - 26.1.2 (NeoForge) requires a real MSA login (offline mode aborts with authlib
+    401 during boot) — needs user to re-login to Mojang in PrismLauncher GUI.
   - Launch a specific instance: `minecraft/launch-detached.sh <instance>` (default 26.1.2).
 
 ### Wayland
