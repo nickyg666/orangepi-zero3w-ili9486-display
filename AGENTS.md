@@ -121,6 +121,23 @@ PowerVR is driven ONLY by the vendor BSP stack in /usr/local (GLES/EGL-only).
 - Desktop shortcuts: `calibrate-touch-hdmi.desktop`, `calibrate-touch-fbcp.desktop`,
   `apply-touch-*.desktop`, `show-touches.desktop`.
 
+## GPU driver provenance (open vs closed)
+
+- **Kernel driver: OPEN SOURCE.** `pvrsrvkm.ko` (loaded, 22 refs) drives
+  `1800000.gpu`. License `Dual MIT/GPL`, author "Imagination Technologies",
+  DKMS source at `/usr/src/img-bxm-dkms-0.1.0-2` (the img-bxm Rogue services
+  kernel module). This is Imagination's official open PowerVR kernel driver.
+- **Userspace: CLOSED.** The `/usr/local` BSP stack (`libEGL/libGLESv2`,
+  `dri/pvr_dri.so`, `libpvr_mesa_wsi.so`) is Imagination's proprietary Rogue
+  user-mode driver (build path `/home/hongyaobin/workspace/gpu_src2/gpu_um_priv/
+  img-bxm/linux/rogue/...`). It is NOT upstream mesa.
+- **Upstream mesa does NOT support PowerVR B-series (BXM-4-64).** Mesa's open
+  `powervr` gallium driver only covers older E-Series GPUs and is incomplete.
+  There is no open userspace for BXE/BXM. So the GPU userspace cannot be
+  open-sourced/replaced; the kernel side already is. Do not try to swap in
+  upstream mesa for the userspace (the GLES-only BSP EGL is the only thing that
+  drives it, see docs/GPU.md).
+
 ## Gotchas
 
 - **Session display number moves** (:0 → :2 after Xvfb grabs :1, and back).
