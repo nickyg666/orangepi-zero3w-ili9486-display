@@ -5,10 +5,9 @@
 #   hdmi  - touch maps to the full HDMI/DP desktop
 #   fbcp  - touch maps to the panel mirror (WYSIWYG)
 #
-# Calibration measures the REAL physical touch range (raw ABS_X/ABS_Y from
-# the ADS7846 via evtest) at the four panel corners, then computes a proper
-# affine matrix (scale + offset + rotation) that maps that measured range
-# onto the full screen - so the borders/edges of the touch surface work.
+# Calibration: fullscreen crosshair GUI (calibrate-gui) that waits
+# indefinitely for touches at each corner, measures the REAL physical
+# touch range, computes the affine matrix, applies it, and saves it.
 #
 # Usage:
 #   touch-calib.sh cal hdmi|fbcp   - run interactive calibration, save profile
@@ -20,10 +19,6 @@ AUTH=/run/user/1000/gdm/Xauthority
 export XAUTHORITY="$AUTH"
 DEV="ADS7846 Touchscreen"
 CONF_DIR=/home/orangepi/.config/touch-calib
-HDMI_CTM="${CONF_DIR}/hdmi.ctm"
-HDMI_CAL="${CONF_DIR}/hdmi.cal"
-FBCP_CTM="${CONF_DIR}/fbcp.ctm"
-FBCP_CAL="${CONF_DIR}/fbcp.cal"
 
 find_display() {
     for d in :0 :2 :1 :3; do
@@ -40,19 +35,20 @@ do_calibrate() {
     fi
     mkdir -p "$CONF_DIR"
     echo "=== $profile calibration ==="
-    echo "Touch and HOLD each corner of the PANEL when prompted (3s each)."
-    echo "Press Ctrl-C to abort."
-    sleep 1
-    python3 /home/orangepi/calibrate_touch.py "$profile" 2>&1
+    echo "A fullscreen crosshair will appear. Touch the PANEL at each"
+    echo "crosshair and HOLD - wait for the next one. No time limit."
+    sleep 2
+    /home/orangepi/calibrate-gui "$profile" "$DISP"
+    echo "Calibration done."
 }
 
 do_apply() {
     local profile="$1"
     local ctm_file cal_file
     if [ "$profile" = "hdmi" ]; then
-        ctm_file="$HDMI_CTM"; cal_file="$HDMI_CAL"
+        ctm_file="$CONF_DIR/hdmi.ctm"; cal_file="$CONF_DIR/hdmi.cal"
     else
-        ctm_file="$FBCP_CTM"; cal_file="$FBCP_CAL"
+        ctm_file="$CONF_DIR/fbcp.ctm"; cal_file="$CONF_DIR/fbcp.cal"
     fi
     if [ ! -f "$ctm_file" ]; then
         echo "No saved $profile profile - run: touch-calib.sh cal $profile"
