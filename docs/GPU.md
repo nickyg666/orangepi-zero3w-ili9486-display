@@ -283,3 +283,38 @@ The old conclusion ("GL desktop compositing via GPU not feasible") is OUTDATED.
   sends changed 16x16 blocks.
 - X config: /etc/X11/xorg.conf.d/10-lcd-modesetting.conf Modes "960x640",
   DisplaySize 812 541 (keeps 30dpi effective after 2x downscale).
+
+## pvr_offscreen: PowerVR offscreen render + dmabuf export (2026-08-06)
+
+`gpu/pvr_offscreen.{c,h}` is a library that renders GLES3 frames on the PowerVR
+(surfaceless EGL on `/dev/dri/renderD129`) into a GBM buffer and exports it as a
+dmabuf fd (via `gbm_bo_get_fd`). No X/DRM master needed. `gpu/bench.c` got
+250fps @1920x1080 on BXM-4-64 MC1.
+
+## pvr_weston: GPU frames into Weston via zwp_linux_dmabuf_v1 (WIP)
+
+`gpu/pvr_weston.c` is a fullscreen Wayland client: renders GLES on the PowerVR
+into the exported dmabuf each frame, imports it into Weston with
+`zwp_linux_dmabuf_v1_create_params` + add + create, and attaches to a surface
+for presentation on the Weston output (DP-1/HDMI). Requires weston-drm running
+as root with a world-writable socket (`XDG_RUNTIME_DIR=/run/weston-rt
+WAYLAND_DISPLAY=wl-drm`).
+
+## GBM format/modifier probe results on renderD129 (2026-08-06)
+
+`gpu/probe_fmt.c` / `gpu/probe_mod.c` query what the PowerVR GBM backend can
+create via `gbm_bo_create` on the render node. Run as root (node is
+root:render, `open()` as user fails -> NULL device -> segv):
+
+- RENDERING-only 1920x1080 buffers:
+  - OK: XRGB8888, XBGR8888, ARGB8888, ABGR8888, RGB24 (stride 7680 / 5760 = 4/3 bpp linear)
+  - FAIL: BGRX8888, BGRA8888, RGBX8888, RGBA8888, RG24("IMG2")
+- Modifier on all successful buffers: `0xffffffffffffff` == GBM_MODIFIER_INVALID
+  (implicit LINEAR; the PVR GBM path has no explicit modifier support).
+- `RENDERING|SCANOUT` fails ("create fail") on the render node - card2 is
+  render-only; SCANOUT buffers would need a display/primary node.
+
+Implication for pvr_weston: the dmabuf is always implicit-linear XRGB8888, so
+Weston's DRM backend can only import it on a plane/output that accepts linear
+XRGB8888 (its own GBM/modifier negotiation must not demand an explicit
+modifier). If import fails, expect `params_failed` -> no `wl_buffer`.
