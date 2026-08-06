@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Calibrate Touch - Panel Mirror (fbcp)
+Comment=Calibrate touch for WYSIWYG on the SPI panel mirroring the display
+Exec=/home/orangepi/touch-calib.sh cal fbcp
+Terminal=true
+Categories=Settings;HardwareSettings;

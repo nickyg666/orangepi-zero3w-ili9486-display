@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Apply Touch Profile - HDMI
+Comment=Apply the saved HDMI touch calibration
+Exec=/home/orangepi/touch-calib.sh apply hdmi
+Terminal=false
+Categories=Settings;HardwareSettings;

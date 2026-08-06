@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Apply Touch Profile - Panel Mirror (fbcp)
+Comment=Apply the saved panel-mirror touch calibration
+Exec=/home/orangepi/touch-calib.sh apply fbcp
+Terminal=false
+Categories=Settings;HardwareSettings;
