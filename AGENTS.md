@@ -82,6 +82,30 @@ Weston on :1 worked but was removed ("Make X the default"). Old mutter-on-SPI
 segfault (g_str_has_prefix NULL on card0 HDMI disconnect) is moot — the panel no
 longer runs a compositor. Do not reintroduce mutter on the SPI panel.
 
+**Weston DRM-backend as a root service is a dead end for the real display
+(2026-08-06).** Running weston 9 with `--backend=drm-backend.so --tty=1` as a
+root systemd service works once (GPU compositor on DP-1, PowerVR renderer) but
+has NO logind helper (`logind: cannot setup systemd-logind helper (-61), using
+legacy fallback`). In legacy mode weston cannot re-train the eDP/DP link after a
+monitor power-cycle: the connector flaps connected/disconnected and the signal
+never comes back until reboot. gdm/Xorg (logind-managed) handles hotplug fine.
+The one working run showed a grey desktop before power-cycling the monitor made
+it permanent-black. Do NOT put weston on the primary display; keep gdm3.
+
+### GPU research (gpu/)
+
+Offscreen GPU rendering on the PowerVR **works and is fast**: `gpu/pvr_offscreen.c`
++ `gpu/bench.c` render GLES3 on the BXM-4-64 via GBM (renderD129 = 1800000.gpu —
+the SPI panel is renderD128, do not confuse them) at **250fps @ 1920x1080**
+with dma-buf export (`EGL_MESA_image_dma_buf_export` import-then-export path).
+The client-side *presentation* surface story is the blocker: BSP EGL has no
+Wayland platform, native IMG Vulkan has no `VK_KHR_wayland_surface`, and the
+GBM→dmabuf→weston import path wedges weston (busy-spins in repaint) because the
+BSP GBM reports modifier `0xffffffffffffff` for rendered buffers while weston
+expects linear/tiled. Zink on system mesa reaches the PowerVR but fails swapchain
+("could not create swapchain" — no wayland surface in the ICD).
+PowerVR is driven ONLY by the vendor BSP stack in /usr/local (GLES/EGL-only).
+
 ### Touch / calibration
 
 - ADS7846 touchscreen (`99-ads7846-calibration.conf`): `Floating "false"` (gnome-shell
