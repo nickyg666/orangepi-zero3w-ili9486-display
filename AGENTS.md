@@ -157,8 +157,24 @@ PowerVR is driven ONLY by the vendor BSP stack in /usr/local (GLES/EGL-only).
 - **Vulkan only lists PowerVR when the native ICD is the first device**; a plain
   `vulkaninfo` shows PowerVR BXM-4-64 MC1 (integrated) first, llvmpipe second.
   Rendering (offscreen/surfaceless) works; windowed present does not.
-- **sudo**: `SUDO_ASKPASS=/home/orangepi/.opencode-askpass sudo -A <cmd>`.
+- **sudo**: `SUDO_ASKPASS=/home/orangepi/.opencode-askpass sudo -A <cmd>`. NOPASSWD rule
+  at `/etc/sudoers.d/99-orangepi` (orangepi can sudo anything passwordless).
 - **Heredocs via `sudo -A bash -c` eat $variables** — write files with the Write
   tool, or single-quote the heredoc delimiter.
 - **`pkill -f "Xvfb :1"` from a root shell can hang the shell** (matches itself);
   use exact PIDs or `pkill -x`.
+
+## Apt / OS version
+
+- OS is **Ubuntu 22.04 Jammy** ("Orange Pi 1.0.0 Jammy"), kernel
+  `6.6.98-sun60iw2` (vendor `linux-image-current-sun60iw2`). BSP GPU stack in
+  /usr/local is NOT dpkg-managed.
+- Sources: vendor `repo.huaweicloud.com/ubuntu-ports` (jammy, in sources.list) +
+  official `ports.ubuntu.com/ubuntu-ports` added via
+  `/etc/apt/sources.list.d/ubuntu-ports.sources` (jammy suites, same components).
+  Both reachable; `apt-get update` works (125MB).
+- **DO NOT `do-release-upgrade` to 24.04/26.04** — the vendor kernel
+  (`sun60iw2`) and PowerVR BSP stack are built for Jammy; 10 vendor packages
+  (`linux-image-current-*`, `linux-headers-current-*`, orangepi-*) would break on
+  Noble, and the board's DRM/display + SPI panel rely on the vendor kernel + dts
+  overlays. 26.04 has no arm64 vendor support. Keep Jammy.
