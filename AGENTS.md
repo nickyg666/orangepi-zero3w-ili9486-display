@@ -133,7 +133,20 @@ PowerVR is driven ONLY by the vendor BSP stack in /usr/local (GLES/EGL-only).
 - **PrismLauncher refuses root**; launch via `su - orangepi -c` (launch-detached.sh).
 - **Stale prismlauncher processes** hold the instance lock; kill all + rm
   `instances/26.1.2/instance.lock` before relaunch.
-- **libopenal segfaults** enumerating devices with no audio server: `ALSOFT_DRIVERS=null`.
+- **libopenal segfaults** (SIGSEGV in `libopenal.so+0x9c670` EffectSlot mixer) with the
+  LWJGL-bundled openal. `ALSOFT_DRIVERS=null` + config `drivers = null` do NOT fix it —
+  the bundled openal crashes processing effect slots regardless. FIXED durably by
+  **patching the natives jar**: replace
+  `libraries/org/lwjgl/lwjgl-openal-natives-linux-arm64/3.4.1-lwjgl.1/...-3.4.1-lwjgl.1.jar`
+  entry `linux/arm64/org/lwjgl/openal/libopenal.so` with
+  `/usr/lib/aarch64-linux-gnu/libopenal.so.1.19.1` and update the `.sha1` (backup kept
+  as `.bundled-bak`). LD_PRELOAD does NOT work (LWJGL re-extracts from jar each launch).
+- **Offline launch (`--offline <name>`) crashes NeoForge** with `MinecraftClientHttpException
+  Status: 401` at `YggdrasilUserApiService.fetchProperties` — NeoForge 26.x requires the
+  Mojang auth service even for a valid session; offline mode aborts during boot.
+  The game ONLY boots with a real MSA account (the account in accounts.json currently has
+  `profileName: None` — needs re-login to Mojang). zink/GPU rendering is confirmed working
+  up to the auth crash (all texture atlases created on PowerVR).
 - **NeoForge early splash window kills zink** (needs GLX): `fml.toml`
   `earlyWindowControl = false`.
 - **PowerVR native Vulkan ICD (libVK_IMG.so) enumerates but CANNOT present to
