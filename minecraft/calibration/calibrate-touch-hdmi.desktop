@@ -2,7 +2,7 @@
 Version=1.0
 Type=Application
 Name=Calibrate Touch - HDMI Mode
-Comment=Calibrate touch so it maps to the full HDMI desktop
+Comment=Measure panel corners, map touch to full HDMI desktop (borders included)
 Exec=/home/orangepi/touch-calib.sh cal hdmi
 Terminal=true
 Categories=Settings;HardwareSettings;

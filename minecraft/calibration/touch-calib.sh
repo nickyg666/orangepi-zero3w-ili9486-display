@@ -2,15 +2,13 @@
 # Touch calibration manager for the ILI9486 panel.
 #
 # Two profiles:
-#   hdmi  - touch maps to the full HDMI/DP desktop. Targets are drawn on the
-#           HDMI display at 1920x1080; you touch the panel where you see them.
-#   fbcp  - touch maps to the panel's mirrored view (WYSIWYG: touch exactly
-#           where you see it on the panel). Targets are drawn at panel
-#           geometry (480x320) but displayed on HDMI for reading.
+#   hdmi  - touch maps to the full HDMI/DP desktop
+#   fbcp  - touch maps to the panel mirror (WYSIWYG)
 #
-# xinput_calibrator computes the raw device calibration (libinput Calibration
-# Matrix). The Coordinate Transformation Matrix then maps panel space onto the
-# target display; both are saved per-profile and applied with xinput.
+# Calibration measures the REAL physical touch range (raw ABS_X/ABS_Y from
+# the ADS7846 via evtest) at the four panel corners, then computes a proper
+# affine matrix (scale + offset + rotation) that maps that measured range
+# onto the full screen - so the borders/edges of the touch surface work.
 #
 # Usage:
 #   touch-calib.sh cal hdmi|fbcp   - run interactive calibration, save profile
@@ -28,50 +26,24 @@ FBCP_CTM="${CONF_DIR}/fbcp.ctm"
 FBCP_CAL="${CONF_DIR}/fbcp.cal"
 
 find_display() {
-    for d in :2 :0 :1 :3; do
+    for d in :0 :2 :1 :3; do
         if DISPLAY="$d" xdpyinfo >/dev/null 2>&1; then echo "$d"; return; fi
     done
-    echo ":2"
+    echo ":0"
 }
 
 do_calibrate() {
     local profile="$1"
-    local ctm_file cal_file geometry
-    if [ "$profile" = "hdmi" ]; then
-        ctm_file="$HDMI_CTM"; cal_file="$HDMI_CAL"; geometry="1920x1080"
-    else
-        ctm_file="$FBCP_CTM"; cal_file="$FBCP_CAL"; geometry="480x320"
-    fi
-    mkdir -p "$CONF_DIR"
-
-    echo "=== $profile calibration ==="
-    echo "Targets will appear on the display. Touch each + on the PANEL."
-    echo "Press Ctrl-C to abort."
-    sleep 1
-
-    OUT=$(DISPLAY="$DISP" xinput_calibrator --device "$DEV" \
-        --output-type xorg.conf.d --geometry "$geometry" 2>&1)
-    CAL=$(echo "$OUT" | grep -A1 'Option.*CalibrationMatrix' | tail -1 | tr -d '"')
-
-    if [ -z "$CAL" ] || ! echo "$CAL" | grep -qE '^[0-9.-]+ [0-9.-]+ [0-9.-]+'; then
-        echo "Calibration failed (did you touch all targets?). Output:"
-        echo "$OUT" | tail -6
+    if [ "$profile" != "hdmi" ] && [ "$profile" != "fbcp" ]; then
+        echo "usage: touch-calib.sh cal hdmi|fbcp"
         return 1
     fi
-
-    # CTM maps the panel's raw space (normalized 0..1) to the display.
-    # Panel is 480x320; the panel shows the full display downscaled, so
-    # identity (X normalizes by device range) gives WYSIWYG for fbcp and
-    # full-desktop control for hdmi. Aspect-fit offset adjustments can be
-    # layered on top if the mirror letterboxes.
-    CTM="1 0 0 0 1 0 0 0 1"
-
-    echo "$CTM" > "$ctm_file"
-    echo "$CAL" > "$cal_file"
-    apply_matrix "$CTM" "$CAL"
-    echo ""
-    echo "Saved $profile profile (CTM: $CTM)"
-    echo "Calibration matrix: $CAL"
+    mkdir -p "$CONF_DIR"
+    echo "=== $profile calibration ==="
+    echo "Touch and HOLD each corner of the PANEL when prompted (3s each)."
+    echo "Press Ctrl-C to abort."
+    sleep 1
+    python3 /home/orangepi/calibrate_touch.py "$profile" 2>&1
 }
 
 do_apply() {
