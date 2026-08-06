@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Show Touches
+Comment=Visualize where touches land on the HDMI display (calibration check)
+Exec=/home/orangepi/show-touches
+Terminal=true
+Categories=Settings;HardwareSettings;
