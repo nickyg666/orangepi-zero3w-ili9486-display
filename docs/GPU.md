@@ -148,6 +148,30 @@ desktop window (GLX or Vulkan). It can only render offscreen:
 That offscreen->fb path is PROVEN (gpu_fbo.c). Minecraft/windowed GPU GL
 is not achievable on this platform/driver combo.
 
+## CONFIRMED ROOT CAUSE of glamor "hang/crash" (2026-08-06)
+Tested the exact glamor requirements against the BSP stack on card0 (HDMI):
+- The BSP vendor stack is coherent Mesa 24.0.1 everywhere (/usr/local/lib, /usr/local/lib/dri).
+- EGL+GBM on card0 works: standalone program (`glamtest`) creates an EGL window surface,
+  makes current, swaps, and reports `PowerVR B-Series BXM-4-64`, GLES 3.2. So the real GPU
+  CAN render on the display card via BSP EGL/GLES.
+- BUT glamor needs a **desktop OpenGL** context: it calls `eglBindAPI(EGL_OPENGL_API)`.
+  The BSP stack has EGL/GLES ONLY — no desktop GL. `eglBindAPI(EGL_OPENGL_API)` returns
+  EGL_BAD_MATCH (0x300c); there is no `EGL_OPENGL_BIT` config, and there is NO libGL in
+  /usr/local/lib (only libGLESv1_CM.so / libGLESv2.so).
+- The system mesa 23.2.1 stamp HAS desktop GL + zink, but `kmsro: driver missing`
+  (no sunxi-drm/pvr for the PowerVR) -> cannot bind the GPU. Attempting to pair
+  system zink (23.2.1) with BSP EGL (24.0.1) gives "DRI driver not from this Mesa build".
+- Consequence: when `AccelMethod "glamor"` is set on card0, modesetting GPU EGL init fails
+  ("libEGL fatal: did not find extension DRI_IMAGE_DRIVER version 1"), X aborts
+  ("Unable to run X server", autologin fails). The old note said "glamor hangs" — it does
+  not hang, it aborts because the vendor EGL cannot supply desktop GL to glamor.
+- This is a hard driver constraint: the only Mesa that drives the PowerVR (BSP 24.1.1)
+  exposes GLES only, and glamor is hard-coded for desktop GL. NOT fixable in config.
+- Working desktop/3D on this board: zink (GL->Vulkan on the real GPU) + `MESA_VK_WSI_DEBUG=sw`
+  for software present, or offscreen (surfaceless) -> FBO -> fb. Native Vulkan window
+  present needs DRI3/Present (libpvr_mesa_wsi has xcb-dri3/xcb-present), which glamor
+  cannot provide (needs desktop GL). Consistent with everything in docs/GPU.md.
+
 ## DRI3 on modesetting X is initialized but NOT functional
 - modesetting X on card1 logs "Initializing extension DRI3" but
   `xdpyinfo -ext DRI3` reports NOT supported. DRI3 needs a functioning
