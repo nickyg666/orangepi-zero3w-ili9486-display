@@ -40,7 +40,7 @@ static GLint upos, utT;
 int main(int argc,char**argv){
   int w=argc>1?atoi(argv[1]):1920, h=argc>2?atoi(argv[2]):1080;
   int frames=argc>3?atoi(argv[3]):300;
-  PvrCtx*ctx=pvr_create("/dev/dri/renderD129",2);
+  PvrCtx*ctx=pvr_create("/dev/dri/renderD128",2);
   if(!ctx){fprintf(stderr,"ctx fail\n");return 1;}
   printf("renderer: %s\n",pvr_renderer_string(ctx));
 

@@ -105,8 +105,14 @@ it permanent-black. Do NOT put weston on the primary display; keep gdm3.
 ### GPU research (gpu/)
 
 Offscreen GPU rendering on the PowerVR **works and is fast**: `gpu/pvr_offscreen.c`
-+ `gpu/bench.c` render GLES3 on the BXM-4-64 via GBM (renderD129 = 1800000.gpu —
-the SPI panel is renderD128, do not confuse them) at **250fps @ 1920x1080**
++ `gpu/bench.c` render GLES3 on the BXM-4-64 via GBM at **~195-250fps @ 1920x1080**.
+**IMPORTANT (26.04): DRM minor numbering CHANGED after the 22.04→26.04 swap** —
+now `renderD128 = 1800000.gpu` (PowerVR) and `renderD129 = 2543000.spi` (SPI panel);
+on the old 22.04 layout it was the opposite. `bench.c` hardcodes the GPU node
+(`pvr_create("/dev/dri/renderD128", ...)`); the 22.04-era AGENTS text saying
+`renderD129=GPU` is WRONG on the current root. Check with:
+`for r in /sys/class/drm/renderD*; do readlink $r/device; done`.
+Verified 2026-08-08 on 26.04: 195.5 fps @ 1920x1080 (BSP GLES 3.2 build 24.2@6603887).
 with dma-buf export (`EGL_MESA_image_dma_buf_export` import-then-export path).
 The client-side *presentation* surface story is the blocker: BSP EGL has no
 Wayland platform, native IMG Vulkan has no `VK_KHR_wayland_surface`, and the
