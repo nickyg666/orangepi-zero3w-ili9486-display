@@ -1,7 +1,7 @@
 # ILI9486 SPI Display Support for Orange Pi Zero 3W
 
 
-# mostly slop - but it does work. that's what matters to me. I don't care what it shits out as long as it works. is it maintainable? probably not. but lets be real. do you really care? maybe.
+# if the latest commit doesn't work right, that's a big oops on my part. Should have made a stable branch and kept my crazy choices in a beta one. Good thing I'm in a development environment, I would never do that in prod. Just check the previous commits. one of them will work flawlessly, and the DTBO should be unchanged - just GPU implementation will be a mess in the latest version. I am currently working on porting the whole project to a more mainline kernel - but it's taking a very long time to compile because the most convenient machine isn't always the most capable.
 
 Working ILI9486 3.5" SPI TFT (480x320, driven at **2x scale** as a 960x640 framebuffer for faster SPI refresh) (wrong, it's so all the elements from DE fit on display) with XPT2046/ADS7846 touchscreen on the Orange Pi Zero 3W (A733, sun60iw2 / 6.6.98-sun60iw2 vendor kernel).
 
