@@ -318,3 +318,22 @@ Implication for pvr_weston: the dmabuf is always implicit-linear XRGB8888, so
 Weston's DRM backend can only import it on a plane/output that accepts linear
 XRGB8888 (its own GBM/modifier negotiation must not demand an explicit
 modifier). If import fails, expect `params_failed` -> no `wl_buffer`.
+
+## Headless weston test result (2026-08-06): NO linux-dmabuf global
+
+Tried to exercise pvr_weston's dmabuf import without taking a real display
+(HDMI/USB-C is owned by the running X/gdm session; stealing card0 mid-session
+is unsafe). Result:
+
+- weston 9 headless backend only ever loads the **pixman** renderer; it has no
+  GL-renderer path (`--renderer=gl` is unhandled; weston.ini `[output]
+  renderer=gl` is ignored; gl-renderer.so is only wired up for drm/x11/wayland
+  backends). With pixman, the compositor does NOT advertise
+  `zwp_linux_dmabuf_v1` -> `pvr_weston` dies at "compositor lacks linux-dmabuf".
+- Conclusion: dmabuf import into weston can only be verified on a real output
+  (drm-backend on card0-DP-1/HDMI-A-1) once a display is free, or via a nested
+  wayland-backend weston hosted inside the running X desktop (headless weston is
+  a dead end for this test).
+
+Note: `linux_dmabuf_setup` IS referenced by headless-backend.so but only the
+GL renderer path registers the wayland global; pixman path skips it.
