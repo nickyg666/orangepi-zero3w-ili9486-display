@@ -1,5 +1,7 @@
 # Workspace Rules
 
+> **Parallel track**: a mainline 6.18.19+ hybrid kernel also boots this board and is now GPU+WiFi capable — see `docs/MAINLINE-KERNEL.md` for that bring-up (separate from this vendor-stack guide).
+
 ## Display / KMS Policy (CRITICAL — read before any display work)
 
 This board (Orange Pi Zero 3W, sun60iw2) has three possible displays:
